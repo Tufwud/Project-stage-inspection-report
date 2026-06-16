@@ -1,0 +1,359 @@
+import { useState } from 'react';
+import { FlatRecord } from '../types';
+import { getFlatOverallProgress, getMilestoneProgress } from '../utils';
+import { SUPERVISORS, DOOR_TYPES, TOWERS_LIST } from '../data/mockData';
+import { Search, Filter, Plus, ChevronRight, Hash, ArrowUpDown, ChevronDown } from 'lucide-react';
+
+interface FlatListTableProps {
+  flats: FlatRecord[];
+  onSelectFlat: (flat: FlatRecord) => void;
+  onAddNewFlat: () => void;
+  selectedTower: string | null;
+  selectedFloor: number | null;
+  selectedMilestoneFilter: string | null;
+  onClearGridFilters: () => void;
+}
+
+type SortField = 'id' | 'flatNo' | 'floor' | 'progress';
+type SortOrder = 'asc' | 'desc';
+
+export default function FlatListTable({
+  flats,
+  onSelectFlat,
+  onAddNewFlat,
+  selectedTower,
+  selectedFloor,
+  selectedMilestoneFilter,
+  onClearGridFilters
+}: FlatListTableProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [towerFilter, setTowerFilter] = useState<string>('all');
+  const [floorFilter, setFloorFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortField, setSortField] = useState<SortField>('flatNo');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+
+  // Multi-level filtering!
+  const filteredFlats = flats.filter(flat => {
+    // Search query matches
+    const matchesSearch = 
+      flat.flatNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      flat.oaNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      flat.doorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      flat.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Spatial filter overlays from TowerFloorHeatmap or custom selectors
+    const matchesGridTower = selectedTower ? flat.towerId === selectedTower : true;
+    const matchesGridFloor = selectedFloor !== null ? flat.floor === selectedFloor : true;
+
+    // Table controls filters
+    const matchesTowerSelect = towerFilter === 'all' ? true : flat.towerId === towerFilter;
+    const matchesFloorSelect = floorFilter === 'all' ? true : flat.floor === parseInt(floorFilter);
+
+    // Progress level filters
+    const overallPct = getFlatOverallProgress(flat);
+    let matchesStatus = true;
+    if (statusFilter === 'completed') {
+      matchesStatus = overallPct === 100;
+    } else if (statusFilter === 'wip') {
+      matchesStatus = overallPct > 0 && overallPct < 100;
+    } else if (statusFilter === 'notstarted') {
+      matchesStatus = overallPct === 0;
+    }
+
+    return matchesSearch && matchesGridTower && matchesGridFloor && matchesTowerSelect && matchesFloorSelect && matchesStatus;
+  });
+
+  // Sorting
+  const sortedFlats = [...filteredFlats].sort((a, b) => {
+    let multiplier = sortOrder === 'asc' ? 1 : -1;
+    
+    if (sortField === 'id') {
+      return a.id.localeCompare(b.id) * multiplier;
+    }
+    if (sortField === 'flatNo') {
+      // Natural sorting for flat numbers if possible
+      const aNum = parseInt(a.flatNo) || 0;
+      const bNum = parseInt(b.flatNo) || 0;
+      return (aNum - bNum) * multiplier;
+    }
+    if (sortField === 'floor') {
+      return (a.floor - b.floor) * multiplier;
+    }
+    if (sortField === 'progress') {
+      return (getFlatOverallProgress(a) - getFlatOverallProgress(b)) * multiplier;
+    }
+    return 0;
+  });
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  // Extract floor options from existing dataset
+  const availableFloors = Array.from(new Set(flats.map(f => f.floor))).sort((a, b) => a - b);
+
+  return (
+    <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden space-y-4 p-6">
+      
+      {/* Table Head Toolbar */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h3 className="font-bold text-lg text-zinc-900 tracking-tight flex items-center gap-2">
+            <span>Room Openings Matrix Log</span>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-500 font-mono">
+              {sortedFlats.length} of {flats.length} listed
+            </span>
+          </h3>
+          <p className="text-sm text-zinc-500 font-medium">
+            Search, filter, and inspect checklist progressions.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Active spatial overlay banner */}
+          {(selectedTower || selectedFloor !== null) && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-indigo-50 border-indigo-200 text-indigo-900 text-xs font-semibold">
+              <span>Grid Filter Active: {selectedTower ? selectedTower : ''} {selectedFloor !== null ? `Floor ${selectedFloor}` : ''}</span>
+              <button onClick={onClearGridFilters} className="text-[10px] font-black underline hover:text-indigo-950 uppercase cursor-pointer">
+                Clear
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={onAddNewFlat}
+            className="px-4 py-2 bg-zinc-900 border border-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Opening Record
+          </button>
+        </div>
+      </div>
+
+      {/* Inputs Filtering Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+        
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-2.5 w-4.5 h-4.5 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Search flat no, OA, door..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-medium"
+          />
+        </div>
+
+        {/* Tower Selector */}
+        <div className="relative flex items-center">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Tower:</span>
+          <select
+            value={towerFilter}
+            onChange={(e) => setTowerFilter(e.target.value)}
+            className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
+          >
+            <option value="all">ALL TOWERS</option>
+            {TOWERS_LIST.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        {/* Floor selector */}
+        <div className="relative flex items-center">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Floor:</span>
+          <select
+            value={floorFilter}
+            onChange={(e) => setFloorFilter(e.target.value)}
+            className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
+          >
+            <option value="all">ALL FLOORS</option>
+            {availableFloors.map(fl => <option key={fl} value={fl}>Level {fl}</option>)}
+          </select>
+        </div>
+
+        {/* Status filter */}
+        <div className="relative flex items-center">
+          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Status:</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
+          >
+            <option value="all">ALL PROGRESS</option>
+            <option value="completed">COMPLETE (100%)</option>
+            <option value="wip">IN PROGRESS (1-99%)</option>
+            <option value="notstarted">NOT STARTED (0%)</option>
+          </select>
+        </div>
+
+      </div>
+
+      {/* Table grid wrapper */}
+      <div className="overflow-x-auto border border-zinc-100 rounded-xl">
+        <table className="w-full text-left border-collapse table-auto">
+          <thead>
+            <tr className="bg-zinc-50 border-b border-zinc-200/50 text-xs font-bold text-zinc-500 tracking-wide">
+              <th className="p-4 cursor-pointer hover:bg-zinc-100/60" onClick={() => toggleSort('id')}>
+                <div className="flex items-center gap-1">
+                  <span>ID</span>
+                  <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                </div>
+              </th>
+              
+              <th className="p-4 cursor-pointer hover:bg-zinc-100/60 font-medium" onClick={() => toggleSort('flatNo')}>
+                <div className="flex items-center gap-1">
+                  <span>Flat No / Tower</span>
+                  <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                </div>
+              </th>
+
+              <th className="p-4">Door Specification</th>
+              
+              {/* Miles progressive checklists */}
+              <th className="p-4 text-center">Frame Fixing</th>
+              <th className="p-4 text-center">Door Fixing</th>
+              <th className="p-4 text-center">Hardware Fixing</th>
+              <th className="p-4 text-center">Handover</th>
+
+              <th className="p-4 text-right cursor-pointer hover:bg-zinc-100/60" onClick={() => toggleSort('progress')}>
+                <div className="flex items-center justify-end gap-1">
+                  <span>Completeness</span>
+                  <ArrowUpDown className="w-3 h-3 text-zinc-400" />
+                </div>
+              </th>
+              
+              <th className="p-4"></th>
+            </tr>
+          </thead>
+          
+          <tbody className="divide-y divide-zinc-100 text-sm font-medium text-zinc-800">
+            {sortedFlats.length === 0 ? (
+              <tr>
+                <td colSpan={10} className="text-center py-10 text-zinc-400 font-semibold text-xs">
+                  No matching door opening records found in current filters.
+                </td>
+              </tr>
+            ) : (
+              sortedFlats.map((flat) => {
+                const overallPct = getFlatOverallProgress(flat);
+                const ffPct = getMilestoneProgress(flat, 'frameFixing');
+                const dfPct = getMilestoneProgress(flat, 'doorFixing');
+                const hwPct = getMilestoneProgress(flat, 'hardwareFixing');
+                const hoPct = getMilestoneProgress(flat, 'handover');
+
+                // Color generators for milestones
+                const getMilestoneColor = (pct: number) => {
+                  if (pct === 100) return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+                  if (pct > 0) return 'text-amber-600 bg-amber-50 border-amber-100';
+                  return 'text-zinc-400 bg-zinc-50/50 border-zinc-200/60';
+                };
+
+                return (
+                  <tr 
+                    key={flat.id}
+                    onClick={() => onSelectFlat(flat)}
+                    className="hover:bg-zinc-50/50 transition cursor-pointer"
+                  >
+                    {/* ID column */}
+                    <td className="p-4 font-mono text-[11px] font-bold text-zinc-400">
+                      {flat.id}
+                    </td>
+
+                    {/* Flat No details */}
+                    <td className="p-4">
+                      <div className="space-y-0.5">
+                        <div className="text-sm font-bold text-zinc-900 leading-none">
+                          Flat {flat.flatNo}
+                        </div>
+                        <div className="text-xs text-zinc-500 font-medium">
+                          {flat.towerId} • Lvl {flat.floor}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Door type */}
+                    <td className="p-4">
+                      <div className="space-y-0.5">
+                        <div className="text-xs font-semibold text-zinc-800 line-clamp-1 max-w-[180px]">
+                          {flat.doorName}
+                        </div>
+                        <div className="text-[10px] font-medium font-mono text-zinc-400">
+                          {flat.oaNo}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Frame Fixing Milestone status */}
+                    <td className="p-4 text-center">
+                      <div className={`inline-block px-2.5 py-1 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(ffPct)}`}>
+                        {ffPct}%
+                      </div>
+                    </td>
+
+                    {/* Door Fixing Milestone status */}
+                    <td className="p-4 text-center">
+                      <div className={`inline-block px-2.5 py-1 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(dfPct)}`}>
+                        {dfPct}%
+                      </div>
+                    </td>
+
+                    {/* Hardware Fixing Milestone status */}
+                    <td className="p-4 text-center">
+                      <div className={`inline-block px-2.5 py-1 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(hwPct)}`}>
+                        {hwPct}%
+                      </div>
+                    </td>
+
+                    {/* Handover Milestone status */}
+                    <td className="p-4 text-center">
+                      <div className={`inline-block px-2.5 py-1 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(hoPct)}`}>
+                        {hoPct}%
+                      </div>
+                    </td>
+
+                    {/* Overall Completion Progress */}
+                    <td className="p-4 text-right">
+                      <div className="flex flex-col items-end gap-1 justify-center h-full">
+                        <span className="text-xs font-bold font-mono text-zinc-900">
+                          {overallPct}%
+                        </span>
+                        
+                        {/* Inline tiny progress track */}
+                        <div className="h-1.5 w-16 bg-zinc-100 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${
+                              overallPct === 100 
+                                ? 'bg-emerald-500' 
+                                : overallPct >= 50 
+                                  ? 'bg-blue-500' 
+                                  : 'bg-amber-400'
+                            }`}
+                            style={{ width: `${overallPct}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Launch editor trigger */}
+                    <td className="p-4 text-center">
+                      <div className="p-1 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-500 group-hover:text-zinc-800 transition">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+      
+    </div>
+  );
+}

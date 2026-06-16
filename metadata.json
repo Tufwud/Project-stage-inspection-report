@@ -1,0 +1,6 @@
+{
+  "name": "project-stage-inspection",
+  "description": "A comprehensive tracking dashboard monitoring door installation progress, checkpoint quality, and milestone completions per tower, floor, and flat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
