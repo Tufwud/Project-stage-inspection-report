@@ -399,14 +399,14 @@ export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTow
       {/* RIGHT COLUMN: Supervisor Background Database Status list */}
       <div className="lg:col-span-7 space-y-6">
         
-        <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm space-y-4">
+        <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
               <ShieldCheck className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h3 className="font-bold text-lg text-zinc-900 tracking-tight">Supervisor Background Settings</h3>
-              <p className="text-sm text-zinc-500 font-medium">Fetched site parameters and initialized specifications.</p>
+              <h3 className="font-bold text-base sm:text-lg text-zinc-900 tracking-tight">Supervisor Background Settings</h3>
+              <p className="text-xs sm:text-sm text-zinc-500 font-medium font-sans">Fetched site parameters and initialized specifications.</p>
             </div>
           </div>
 

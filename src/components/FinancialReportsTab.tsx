@@ -383,20 +383,20 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
 
       {/* REPORT C: STAGE-WISE BREAKDOWN MATRIX */}
       <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden">
-        <div className="px-6 py-5 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/20">
+        <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/20">
           <div className="space-y-1">
-            <h3 className="font-bold text-base text-zinc-900 tracking-tight flex items-center gap-2">
+            <h3 className="font-bold text-sm sm:text-base text-zinc-900 tracking-tight flex flex-wrap items-center gap-2">
               <span className="px-2 py-0.5 bg-zinc-200 rounded text-[11px] font-bold font-mono text-zinc-650 uppercase">REPORT C</span>
-              Stage-wise Completed Cost (Project Towers)
+              <span>Stage-wise Completed Cost (Project Towers)</span>
             </h3>
-            <p className="text-xs text-zinc-500 font-medium">Reconciles progressive payouts splitting contractual price per task milestones.</p>
+            <p className="text-xs text-zinc-500 font-medium font-sans">Reconciles progressive payouts splitting contractual price per task milestones.</p>
           </div>
           <button
             onClick={handleExportStagesReport}
-            className="self-start sm:self-auto px-4 py-2 bg-zinc-850 hover:bg-black text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-zinc-850 hover:bg-black text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
           >
-            <Download className="w-4 h-4" />
-            Download Excel Matrix
+            <Download className="w-4 h-4 shrink-0" />
+            <span>Download Excel Matrix</span>
           </button>
         </div>
 
@@ -464,20 +464,20 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
 
       {/* 2. REPORT B: PROJECT COMPLIANCE AND COST SUMMARY */}
       <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden">
-        <div className="px-6 py-5 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/20">
+        <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/20">
           <div className="space-y-1">
-            <h3 className="font-bold text-base text-zinc-900 tracking-tight flex items-center gap-2">
+            <h3 className="font-bold text-sm sm:text-base text-zinc-900 tracking-tight flex flex-wrap items-center gap-2">
               <span className="px-2 py-0.5 bg-zinc-200 rounded text-[11px] font-bold font-mono text-zinc-650 uppercase">REPORT B</span>
-              Completed Project / Tower Cost Summary
+              <span>Completed Project / Tower Cost Summary</span>
             </h3>
-            <p className="text-xs text-zinc-500 font-medium">Core aggregates illustrating total budgets face-to-face with work certified payout values.</p>
+            <p className="text-xs text-zinc-500 font-medium font-sans">Core aggregates illustrating total budgets face-to-face with work certified payout values.</p>
           </div>
           <button
             onClick={handleExportTowersReport}
-            className="self-start sm:self-auto px-4 py-2 bg-zinc-850 hover:bg-black text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-zinc-850 hover:bg-black text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
           >
-            <Download className="w-4 h-4" />
-            Download Summary Excel
+            <Download className="w-4 h-4 shrink-0" />
+            <span>Download Summary Excel</span>
           </button>
         </div>
 
@@ -563,46 +563,46 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
 
       {/* 3. REPORT A: DETAILED DOOR-LEVEL CHECKLISTS & COSTING REPORT */}
       <div className="bg-white rounded-2xl border border-zinc-200 shadow-xs overflow-hidden">
-        <div className="px-6 py-5 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/20">
+        <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/20">
           <div className="space-y-1">
-            <h3 className="font-bold text-base text-zinc-900 tracking-tight flex items-center gap-2">
+            <h3 className="font-bold text-sm sm:text-base text-zinc-900 tracking-tight flex flex-wrap items-center gap-2">
               <span className="px-2 py-0.5 bg-zinc-200 rounded text-[11px] font-bold font-mono text-zinc-650 uppercase">REPORT A</span>
-              Door-level Checklist & Cost Details
+              <span>Door-level Checklist & Cost Details</span>
             </h3>
-            <p className="text-xs text-zinc-500 font-medium">Granular lookup of compliance state matched with assigned pricing values for every opening.</p>
+            <p className="text-xs text-zinc-500 font-medium font-sans">Granular lookup of compliance state matched with assigned pricing values for every opening.</p>
           </div>
           <button
             onClick={handleExportDoorsReport}
-            className="self-start sm:self-auto px-4 py-2 bg-zinc-850 hover:bg-black text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-zinc-850 hover:bg-black text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
           >
-            <Download className="w-4 h-4" />
-            Download Doors Excel
+            <Download className="w-4 h-4 shrink-0" />
+            <span>Download Doors Excel</span>
           </button>
         </div>
 
         {/* Search & Filtration Bar */}
-        <div className="px-6 py-4 border-b border-zinc-200 bg-zinc-50/20 flex flex-col sm:flex-row items-center gap-3.5">
-          <div className="w-full sm:flex-1 relative">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="px-4 py-4 sm:px-6 sm:py-4 border-b border-zinc-200 bg-zinc-50/20 flex flex-col lg:flex-row items-center gap-3">
+          <div className="w-full lg:flex-1 relative">
+            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="Search by Flat ID, Flat No, Door Spec..."
-              className="w-full text-xs font-semibold pl-9 pr-4 py-2 bg-white border border-zinc-250 hover:border-zinc-350 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition shadow-2xs text-zinc-800"
+              className="w-full text-xs font-semibold pl-10 pr-4 py-2.5 bg-white border border-zinc-250 hover:border-zinc-350 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition shadow-2xs text-zinc-800"
             />
           </div>
 
-          <div className="w-full sm:w-auto flex items-center gap-3.5 self-stretch sm:self-auto">
-            <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-zinc-500">
+          <div className="w-full lg:w-auto flex flex-row items-center gap-2 self-stretch lg:self-auto">
+            <div className="flex items-center gap-1 shrink-0 text-[11px] font-bold text-zinc-400 uppercase tracking-wider font-mono mr-1">
               <Filter className="w-3.5 h-3.5" />
-              <span>Filters</span>
+              <span className="hidden sm:inline">Filters</span>
             </div>
             
             {/* Tower Filter */}
             <select
               value={selectedTower}
               onChange={e => setSelectedTower(e.target.value)}
-              className="flex-1 sm:flex-none py-1.5 pl-2 pr-7 text-xs font-bold bg-white border border-zinc-200 rounded-xl text-zinc-700 cursor-pointer shadow-2xs"
+              className="flex-1 lg:flex-none py-2 px-2.5 text-xs font-bold bg-white border border-zinc-200 rounded-xl text-zinc-700 cursor-pointer shadow-2xs focus:ring-1 focus:ring-indigo-500"
             >
               <option value="All">All Towers</option>
               {uniqueTowers.map(t => (
@@ -614,7 +614,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
             <select
               value={selectedFloor}
               onChange={e => setSelectedFloor(e.target.value)}
-              className="flex-1 sm:flex-none py-1.5 pl-2 pr-7 text-xs font-bold bg-white border border-zinc-200 rounded-xl text-zinc-700 cursor-pointer shadow-2xs"
+              className="flex-1 lg:flex-none py-2 px-2.5 text-xs font-bold bg-white border border-zinc-200 rounded-xl text-zinc-700 cursor-pointer shadow-2xs focus:ring-1 focus:ring-indigo-500"
             >
               <option value="All">All Floors</option>
               {uniqueFloors.map(f => (

@@ -251,53 +251,53 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         
         {/* Modern Segmented Navigation Tabs */}
-        <div className="flex items-center gap-1 border-b border-zinc-200 bg-white p-1 rounded-xl shadow-xs overflow-x-auto scrollbar-none whitespace-nowrap scroll-smooth">
+        <div className="grid grid-cols-2 sm:flex sm:flex-row items-center gap-1 border border-zinc-200/60 bg-white p-1 rounded-xl shadow-xs">
           <button
             onClick={() => setActiveTab('matrix')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-2.5 px-3 sm:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shrink-0 ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-2.5 sm:px-5 lg:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
               activeTab === 'matrix'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <LayoutDashboard className="w-4 h-4 shrink-0" />
-            <span>Compliance Matrix</span>
+            <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Compliance Grid</span>
           </button>
           
           <button
             onClick={() => setActiveTab('background')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-2.5 px-3 sm:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shrink-0 ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-2.5 sm:px-5 lg:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
               activeTab === 'background'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <Settings className="w-4 h-4 shrink-0" />
-            <span>Background Settings</span>
+            <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Specs & Rates</span>
           </button>
 
           <button
             onClick={() => setActiveTab('sheets')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-2.5 px-3 sm:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shrink-0 ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-2.5 sm:px-5 lg:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
               activeTab === 'sheets'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <FileSpreadsheet className="w-4 h-4 shrink-0" />
-            <span>Google Sheets Sync</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Sheets Sync</span>
           </button>
 
           <button
             onClick={() => setActiveTab('reports')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-2.5 px-3 sm:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shrink-0 ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-2.5 sm:px-5 lg:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer col-span-2 sm:col-span-1 ${
               activeTab === 'reports'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <Coins className="w-4 h-4 shrink-0" />
-            <span>Financial Costing & Reports</span>
+            <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Reports</span>
           </button>
         </div>
 

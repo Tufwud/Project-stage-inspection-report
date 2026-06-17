@@ -55,15 +55,15 @@ export default function TowerFloorHeatmap({ flats, selectedTower, selectedFloor,
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm">
+    <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-zinc-100">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
             <Grid2X2 className="w-4.5 h-4.5" />
           </div>
           <div>
-            <h3 className="font-bold text-lg text-zinc-900 tracking-tight">Floor & Tower Heatmap</h3>
-            <p className="text-sm text-zinc-500 font-medium">Visual average of overall completion percentage per floor level.</p>
+            <h3 className="font-bold text-base sm:text-lg text-zinc-900 tracking-tight">Floor & Tower Heatmap</h3>
+            <p className="text-xs sm:text-sm text-zinc-500 font-medium font-sans">Visual average of overall completion percentage per floor level.</p>
           </div>
         </div>
         
@@ -71,17 +71,17 @@ export default function TowerFloorHeatmap({ flats, selectedTower, selectedFloor,
         {(selectedTower || selectedFloor) && (
           <button
             onClick={() => onFilterChange(null, null)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 transition"
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 transition self-start sm:self-auto"
           >
             Clear Grid Filter
           </button>
         )}
       </div>
 
-      <div className="overflow-x-auto pb-2">
-        <div className="min-w-[600px] space-y-3">
+      <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
+        <div className="w-max min-w-full space-y-3">
           {/* Header Row (Towers) */}
-          <div className="grid gap-2" style={{ gridTemplateColumns: `80px repeat(${uniqueTowers.length}, 1fr)` }}>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `80px repeat(${uniqueTowers.length}, minmax(110px, 1fr))` }}>
             {/* Corner label */}
             <div className="flex items-center justify-end pr-2 text-[10px] font-bold tracking-wider text-zinc-400 uppercase font-mono">
               LEVEL
@@ -104,7 +104,7 @@ export default function TowerFloorHeatmap({ flats, selectedTower, selectedFloor,
 
           {/* Matrix Rows (Floors) */}
           {uniqueFloors.map(floor => (
-            <div key={floor} className="grid gap-2" style={{ gridTemplateColumns: `80px repeat(${uniqueTowers.length}, 1fr)` }}>
+            <div key={floor} className="grid gap-2" style={{ gridTemplateColumns: `80px repeat(${uniqueTowers.length}, minmax(110px, 1fr))` }}>
               {/* Floor Label */}
               <button
                 onClick={() => onFilterChange(null, floor === selectedFloor ? null : floor)}
@@ -126,7 +126,7 @@ export default function TowerFloorHeatmap({ flats, selectedTower, selectedFloor,
                   return (
                     <div
                       key={tower + floor}
-                      className="aspect-video bg-zinc-50/50 border border-dashed border-zinc-200 rounded-xl flex items-center justify-center text-[10px] font-mono text-zinc-300 font-medium select-none"
+                      className="min-h-[58px] bg-zinc-50/50 border border-dashed border-zinc-200 rounded-xl flex items-center justify-center text-[10px] font-mono text-zinc-300 font-medium select-none"
                     >
                       Empty
                     </div>
@@ -137,20 +137,20 @@ export default function TowerFloorHeatmap({ flats, selectedTower, selectedFloor,
                   <button
                     key={tower + floor}
                     onClick={() => onFilterChange(isActive ? null : tower, isActive ? null : floor)}
-                    className={`aspect-video rounded-xl border p-2 flex flex-col justify-between transition-all duration-200 text-left focus:outline-none focus:ring-2 focus:ring-zinc-400 group relative ${getCellColorClass(stats.avg, isActive)}`}
+                    className={`min-h-[58px] rounded-xl border p-2 flex flex-col justify-between transition-all duration-200 text-left focus:outline-none focus:ring-2 focus:ring-zinc-400 group relative ${getCellColorClass(stats.avg, isActive)}`}
                   >
-                    <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center justify-between w-full gap-1">
                       <span className="text-[10px] font-bold font-mono tracking-tight opacity-75">
                         {stats.count} {stats.count === 1 ? 'door' : 'doors'}
                       </span>
-                      <span className="text-xs font-bold leading-none font-sans">
+                      <span className="text-xs font-bold leading-none font-sans shrink-0">
                         {stats.avg}%
                       </span>
                     </div>
 
-                    <div className="h-1 w-full bg-black/10 rounded-full overflow-hidden mt-2">
+                    <div className="h-1.5 w-full bg-black/10 rounded-full overflow-hidden mt-1">
                       <div 
-                        className="h-full bg-white/70 rounded-full transition-all duration-300" 
+                        className="h-full bg-white/80 rounded-full transition-all duration-300" 
                         style={{ width: `${stats.avg}%` }}
                       ></div>
                     </div>

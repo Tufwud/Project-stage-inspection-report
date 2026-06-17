@@ -99,18 +99,18 @@ export default function FlatListTable({
   const availableFloors = Array.from(new Set(flats.map(f => f.floor))).sort((a, b) => a - b);
 
   return (
-    <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden space-y-4 p-6">
+    <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden space-y-4 p-4 sm:p-6">
       
       {/* Table Head Toolbar */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h3 className="font-bold text-lg text-zinc-900 tracking-tight flex items-center gap-2">
+          <h3 className="font-bold text-base sm:text-lg text-zinc-900 tracking-tight flex flex-wrap items-center gap-2">
             <span>Room Openings Matrix Log</span>
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-500 font-mono">
               {sortedFlats.length} of {flats.length} listed
             </span>
           </h3>
-          <p className="text-sm text-zinc-500 font-medium">
+          <p className="text-xs sm:text-sm text-zinc-500 font-medium">
             Search, filter, and inspect checklist progressions.
           </p>
         </div>
@@ -119,8 +119,8 @@ export default function FlatListTable({
           {/* Active spatial overlay banner */}
           {(selectedTower || selectedFloor !== null) && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-indigo-50 border-indigo-200 text-indigo-900 text-xs font-semibold">
-              <span>Grid Filter Active: {selectedTower ? selectedTower : ''} {selectedFloor !== null ? `Floor ${selectedFloor}` : ''}</span>
-              <button onClick={onClearGridFilters} className="text-[10px] font-black underline hover:text-indigo-950 uppercase cursor-pointer">
+              <span className="truncate max-w-[200px]">Grid Filter Active: {selectedTower ? selectedTower : ''} {selectedFloor !== null ? `Floor ${selectedFloor}` : ''}</span>
+              <button onClick={onClearGridFilters} className="text-[10px] font-black underline hover:text-indigo-950 uppercase cursor-pointer shrink-0">
                 Clear
               </button>
             </div>
@@ -128,7 +128,7 @@ export default function FlatListTable({
 
           <button
             onClick={onAddNewFlat}
-            className="px-4 py-2 bg-zinc-900 border border-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2"
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-zinc-900 border border-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add Opening Record
@@ -137,7 +137,7 @@ export default function FlatListTable({
       </div>
 
       {/* Inputs Filtering Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 bg-zinc-50 p-4 rounded-xl border border-zinc-100">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 bg-zinc-50 p-3 sm:p-4 rounded-xl border border-zinc-100">
         
         {/* Search */}
         <div className="relative">

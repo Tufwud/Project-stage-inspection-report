@@ -526,7 +526,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                           <select
                             value={currentStateKey}
                             onChange={(e) => handleDropdownChange(activeTab, taskKey, e.target.value)}
-                            className={`px-3 py-1.5 border rounded-xl text-xs font-bold focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer ${currentChoice.color}`}
+                            className={`w-full sm:w-auto max-w-[150px] xs:max-w-[200px] sm:max-w-[250px] md:max-w-xs truncate px-3 py-1.5 border rounded-xl text-xs font-bold focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer ${currentChoice.color}`}
                           >
                             {Object.values(QUALITATIVE_CHOICES).map(choice => (
                               <option key={choice.key} value={choice.key} className="bg-white text-zinc-800 font-medium">
