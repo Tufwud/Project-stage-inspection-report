@@ -12,6 +12,17 @@ import {
 import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+// Helper to get local timestamp in YYYY-MM-DDTHH:mm format
+const getLocalTimestamp = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 interface FlatDetailModalProps {
   flat: FlatRecord | null;
   isOpen: boolean;
@@ -60,7 +71,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
           milestone.doneBy = SUPERVISORS[0]; 
         }
         if (!milestone.timestamp) {
-          milestone.timestamp = new Date().toISOString().substring(0, 16); // format for local datetime-local input
+          milestone.timestamp = getLocalTimestamp(); // format for local datetime-local input
         }
       }
 
@@ -85,7 +96,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
 
       if (complete) {
         if (!updatedMilestone.doneBy) updatedMilestone.doneBy = SUPERVISORS[0];
-        if (!updatedMilestone.timestamp) updatedMilestone.timestamp = new Date().toISOString().substring(0, 16);
+        if (!updatedMilestone.timestamp) updatedMilestone.timestamp = getLocalTimestamp();
       } else {
         updatedMilestone.timestamp = "";
       }
@@ -559,15 +570,24 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-zinc-600 mb-1 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                    Timestamp Log
+                  <label className="text-xs font-bold text-zinc-600 mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                      Timestamp Log
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleTimestampChange(activeTab, getLocalTimestamp())}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-extrabold transition-colors cursor-pointer"
+                    >
+                      Set Current Time
+                    </button>
                   </label>
                   <input
                     type="datetime-local"
                     value={formData[activeTab].timestamp ? formData[activeTab].timestamp.substring(0, 16) : ""}
                     onChange={(e) => handleTimestampChange(activeTab, e.target.value)}
-                    className="w-full mt-1 px-3 py-1.5 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 bg-white font-medium font-mono"
+                    className="w-full mt-1 px-3 py-1.5 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 bg-white font-medium font-mono cursor-pointer"
                   />
                 </div>
               </div>
@@ -577,48 +597,52 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
         </form>
 
         {/* Action Buttons */}
-        <div className="p-6 border-t border-zinc-100 bg-zinc-50 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            {formData.id !== 'NEW' && onDelete && (
+        <div className="p-4 sm:p-6 border-t border-zinc-100 bg-zinc-50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            {/* Left/Secondary Actions */}
+            <div className="flex flex-row items-center gap-2 order-2 sm:order-1 w-full sm:w-auto">
+              {formData.id !== 'NEW' && onDelete && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition-colors cursor-pointer min-h-[44px] sm:min-h-[38px]"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-550" />
+                  <span>Remove</span>
+                </button>
+              )}
+
+              {formData.id !== 'NEW' && (
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 text-xs font-bold rounded-xl border border-indigo-200 transition-colors cursor-pointer min-h-[44px] sm:min-h-[38px]"
+                >
+                  <Download className="w-4 h-4 text-indigo-600" />
+                  <span className="whitespace-nowrap">PDF Certificate</span>
+                </button>
+              )}
+            </div>
+
+            {/* Right/Primary Actions */}
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 order-1 sm:order-2 w-full sm:w-auto">
               <button
                 type="button"
-                onClick={() => setConfirmingDelete(true)}
-                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition flex items-center gap-1.5"
+                onClick={onClose}
+                className="inline-flex items-center justify-center px-5 py-2.5 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-500 bg-white hover:bg-zinc-50 transition-colors cursor-pointer min-h-[44px] sm:min-h-[38px]"
               >
-                <Trash2 className="w-4 h-4" />
-                Remove
+                Cancel
               </button>
-            )}
-
-            {/* Download Certificate */}
-            {formData.id !== 'NEW' && (
+              
               <button
                 type="button"
-                onClick={handleDownloadReport}
-                className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 text-xs font-bold rounded-xl border border-indigo-200 transition flex items-center gap-1.5 shadow-sm"
+                onClick={handleSubmit}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm sm:text-xs font-extrabold shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/25 active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer min-h-[48px] sm:min-h-[38px] text-center"
               >
-                <Download className="w-4 h-4" />
-                Download PDF Certificate
+                <Save className="w-4.5 h-4.5 sm:w-4 sm:h-4" />
+                <span>Save Record</span>
               </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-500 bg-white hover:bg-zinc-50 transition"
-            >
-              Cancel
-            </button>
-            
-            <button
-              onClick={handleSubmit}
-              className="px-5 py-2 bg-zinc-900 border border-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-805 hover:shadow transition flex items-center gap-1.5 whitespace-nowrap"
-            >
-              <Save className="w-4 h-4" />
-              Save Record
-            </button>
+            </div>
           </div>
         </div>
       </motion.div>

@@ -140,20 +140,7 @@ export default function CsvDataActions({ onDataImport, onResetData, onWipeData, 
         </div>
       )}
 
-      {/* Structural schema guidelines help card */}
-      <div className="mt-6 bg-zinc-50/50 border border-zinc-100 rounded-xl p-4 flex gap-3.5 items-start">
-        <HelpCircle className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
-        <div className="space-y-1 text-xs text-zinc-500 font-medium">
-          <p className="font-bold text-zinc-700">File Structure Protocol</p>
-          <p className="leading-relaxed">
-            Imported spreadsheets must match the precise columnar pattern starting with:
-            <code className="block bg-zinc-100 p-2 rounded text-[11px] font-mono whitespace-nowrap overflow-x-auto text-zinc-600 mt-1">
-              ID,OA No,Tower ID,Flats/Floor,Floor,Flat No,Door Name,Frame Fixing - Fastener fixing,...
-            </code>
-            Toggles should be formatted as simple <code className="bg-zinc-100 px-1 rounded font-mono text-[11px]">Y</code> or <code className="bg-zinc-100 px-1 rounded font-mono text-[11px]">N</code> notations.
-          </p>
-        </div>
-      </div>
+
 
       {/* Custom Modal Confirmation for presets reset */}
       {confirmingReset && (
