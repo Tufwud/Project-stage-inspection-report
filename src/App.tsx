@@ -12,8 +12,9 @@ import FlatDetailModal from './components/FlatDetailModal';
 import CsvDataActions from './components/CsvDataActions';
 import BackgroundValuesTab from './components/BackgroundValuesTab';
 import GoogleSheetsTab from './components/GoogleSheetsTab';
+import FinancialReportsTab from './components/FinancialReportsTab';
 
-import { Building2, ClipboardCheck, LayoutDashboard, Plus, RefreshCw, Layers, Settings, FileSpreadsheet } from 'lucide-react';
+import { Building2, ClipboardCheck, LayoutDashboard, Plus, RefreshCw, Layers, Settings, FileSpreadsheet, Coins } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const LOCAL_STORAGE_KEY = "door_quality_compliance_dashboard_records";
@@ -21,7 +22,7 @@ const LOCAL_STORAGE_KEY = "door_quality_compliance_dashboard_records";
 export default function App() {
   const [flats, setFlats] = useState<FlatRecord[]>([]);
   const [selectedMilestone, setSelectedMilestone] = useState<MilestoneKey | null>(null);
-  const [activeTab, setActiveTab] = useState<'matrix' | 'background' | 'sheets'>('matrix');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'background' | 'sheets' | 'reports'>('matrix');
   
   // Grid filters
   const [selectedTower, setSelectedTower] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export default function App() {
     totalFloors: number;
     flatsPerFloor: number;
     doorTypesToGenerate: string[];
+    defaultPrice?: number;
   }) => {
     const generated: FlatRecord[] = [];
     
@@ -47,6 +49,8 @@ export default function App() {
       if (num % 10 === 3 && num % 100 !== 13) return 'rd';
       return 'th';
     };
+
+    const initialPrice = config.defaultPrice !== undefined ? config.defaultPrice : 5000;
 
     for (let floor = 1; floor <= config.totalFloors; floor++) {
       const floorName = floor + getOrdinalSuffix(floor) + ' Floor';
@@ -70,10 +74,11 @@ export default function App() {
             floor: floor,
             flatNo: flatNo,
             doorName: realName,
-            frameFixing: { fastenerFixing: false, frameLockAreaFinish: false, outsideArchitraveFixing: false, insideArchitraveFixing: false, doneBy: "", timestamp: "" },
-            doorFixing: { shutterEdgeFinishing: false, gapBetweenFrameAndShutter: false, iSealFixing: false, visionGlassBeatFinishing: false, doneBy: "", timestamp: "" },
-            hardwareFixing: { hingeFitting: false, lockWithHandleFitting: false, eyeviewInstallation: false, towerBoltInstallation: false, doorCloserInstallation: false, autoDropSealInstallation: false, doneBy: "", timestamp: "" },
-            handover: { frameCarpatchFillingSanding: false, frameTouchUp: false, shutterEdgeFinishing: false, lockSlotAreaFinishing: false, shutterTouchUp: false, hardwareCleaning: false, plasticCoverRemoval: false, keysHandover: false, timestamp: "" }
+            price: initialPrice,
+            frameFixing: { fastenerFixing: 'not_started', frameLockAreaFinish: 'not_started', outsideArchitraveFixing: 'not_started', insideArchitraveFixing: 'not_started', doneBy: "", timestamp: "" },
+            doorFixing: { shutterEdgeFinishing: 'not_started', gapBetweenFrameAndShutter: 'not_started', iSealFixing: 'not_started', visionGlassBeatFinishing: 'not_started', doneBy: "", timestamp: "" },
+            hardwareFixing: { hingeFitting: 'not_started', lockWithHandleFitting: 'not_started', eyeviewInstallation: 'not_started', towerBoltInstallation: 'not_started', doorCloserInstallation: 'not_started', autoDropSealInstallation: 'not_started', doneBy: "", timestamp: "" },
+            handover: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "" }
           });
         });
       }
@@ -130,10 +135,11 @@ export default function App() {
       floor: selectedFloor !== null ? selectedFloor : 1,
       flatNo: "",
       doorName: "Main Entrance (Teak Wood)",
-      frameFixing: { fastenerFixing: false, frameLockAreaFinish: false, outsideArchitraveFixing: false, insideArchitraveFixing: false, doneBy: "", timestamp: "" },
-      doorFixing: { shutterEdgeFinishing: false, gapBetweenFrameAndShutter: false, iSealFixing: false, visionGlassBeatFinishing: false, doneBy: "", timestamp: "" },
-      hardwareFixing: { hingeFitting: false, lockWithHandleFitting: false, eyeviewInstallation: false, towerBoltInstallation: false, doorCloserInstallation: false, autoDropSealInstallation: false, doneBy: "", timestamp: "" },
-      handover: { frameCarpatchFillingSanding: false, frameTouchUp: false, shutterEdgeFinishing: false, lockSlotAreaFinishing: false, shutterTouchUp: false, hardwareCleaning: false, plasticCoverRemoval: false, keysHandover: false, timestamp: "" }
+      price: 5000,
+      frameFixing: { fastenerFixing: 'not_started', frameLockAreaFinish: 'not_started', outsideArchitraveFixing: 'not_started', insideArchitraveFixing: 'not_started', doneBy: "", timestamp: "" },
+      doorFixing: { shutterEdgeFinishing: 'not_started', gapBetweenFrameAndShutter: 'not_started', iSealFixing: 'not_started', visionGlassBeatFinishing: 'not_started', doneBy: "", timestamp: "" },
+      hardwareFixing: { hingeFitting: 'not_started', lockWithHandleFitting: 'not_started', eyeviewInstallation: 'not_started', towerBoltInstallation: 'not_started', doorCloserInstallation: 'not_started', autoDropSealInstallation: 'not_started', doneBy: "", timestamp: "" },
+      handover: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "" }
     };
 
     setEditingFlat(defaultNew);
@@ -171,6 +177,10 @@ export default function App() {
 
   const handleResetData = () => {
     saveFlats(DEFAULT_FLATS);
+  };
+
+  const handleWipeAll = () => {
+    saveFlats([]);
   };
 
   const handleGridFilterChange = (tower: string | null, floor: number | null) => {
@@ -241,41 +251,53 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         
         {/* Modern Segmented Navigation Tabs */}
-        <div className="flex items-center gap-1 border-b border-zinc-200 bg-white p-1 rounded-xl shadow-xs">
+        <div className="flex items-center gap-1 border-b border-zinc-200 bg-white p-1 rounded-xl shadow-xs overflow-x-auto scrollbar-none whitespace-nowrap scroll-smooth">
           <button
             onClick={() => setActiveTab('matrix')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-3 px-6 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-2.5 px-3 sm:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shrink-0 ${
               activeTab === 'matrix'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <LayoutDashboard className="w-4 h-4" />
+            <LayoutDashboard className="w-4 h-4 shrink-0" />
             <span>Compliance Matrix</span>
           </button>
           
           <button
             onClick={() => setActiveTab('background')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-3 px-6 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-2.5 px-3 sm:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shrink-0 ${
               activeTab === 'background'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <Settings className="w-4 h-4" />
-            <span>Background Values Input Form</span>
+            <Settings className="w-4 h-4 shrink-0" />
+            <span>Background Settings</span>
           </button>
 
           <button
             onClick={() => setActiveTab('sheets')}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-3 px-6 text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-2.5 px-3 sm:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shrink-0 ${
               activeTab === 'sheets'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4 shrink-0" />
             <span>Google Sheets Sync</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 py-2.5 px-3 sm:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer shrink-0 ${
+              activeTab === 'reports'
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
+            }`}
+          >
+            <Coins className="w-4 h-4 shrink-0" />
+            <span>Financial Costing & Reports</span>
           </button>
         </div>
 
@@ -318,6 +340,7 @@ export default function App() {
             <CsvDataActions 
               onDataImport={handleDataImport}
               onResetData={handleResetData}
+              onWipeData={handleWipeAll}
               flats={flats}
             />
           </div>
@@ -327,11 +350,16 @@ export default function App() {
               flats={flats}
               onGenerateFlats={handleGenerateFlats}
               onClearTower={handleClearTower}
+              onWipeAll={handleWipeAll}
             />
+          </div>
+        ) : activeTab === 'sheets' ? (
+          <div className="pt-2 animate-fadeIn">
+            <GoogleSheetsTab flats={flats} />
           </div>
         ) : (
           <div className="pt-2 animate-fadeIn">
-            <GoogleSheetsTab flats={flats} />
+            <FinancialReportsTab flats={flats} />
           </div>
         )}
 

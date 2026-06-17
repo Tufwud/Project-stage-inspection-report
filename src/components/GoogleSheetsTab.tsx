@@ -8,7 +8,8 @@ import {
   updateSheetValues, 
   findExistingSpreadsheets,
   prepareRawQualityLogsData,
-  prepareConsolidatedReportsData
+  prepareConsolidatedReportsData,
+  prepareStageCostingReportData
 } from '../lib/googleSheets';
 import { User } from 'firebase/auth';
 import { 
@@ -175,9 +176,16 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
       setStatusStep('Writing Executive Order Compliance aggregates...');
       await updateSheetValues(token, activeId, 'Consolidated Reports!A1', summaryValues);
 
+      // 5. Prepare and write Stage-wise Cost Breakdown
+      setStatusStep('Calculating project stage budgets & compiling cost variance reports...');
+      const costingValues = prepareStageCostingReportData(flats);
+
+      setStatusStep('Writing Project Stage-wise Cost Breakdown aggregates...');
+      await updateSheetValues(token, activeId, 'Stage-wise Cost Breakdown!A1', costingValues);
+
       // Finish successfully
       setStatusStep('Completed in-sync!');
-      setSuccessBanner(`Successfully synchronized ${flats.length} records. Both "Raw Quality Logs" and "Consolidated Reports" tabs are fully updated!`);
+      setSuccessBanner(`Successfully synchronized ${flats.length} records. All tabs - "Raw Quality Logs", "Consolidated Reports", and "Stage-wise Cost Breakdown" - are fully updated and synchronized!`);
       fetchDriveFiles(token); // refresh file list
     } catch (err: any) {
       console.error('Error synchronizing spreadsheet:', err);

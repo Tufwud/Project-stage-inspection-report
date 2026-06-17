@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { FlatRecord, MILESTONES, MilestoneKey } from '../types';
+import { FlatRecord, MILESTONES, MilestoneKey, QUALITATIVE_CHOICES, QualitativeState } from '../types';
 import { SUPERVISORS, DOOR_TYPES, TOWERS_LIST } from '../data/mockData';
-import { getMilestoneProgress } from '../utils';
-import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock } from 'lucide-react';
+import { 
+  getMilestoneProgress, 
+  getSubtaskState, 
+  getFinancialStageProgress, 
+  getFinancialStageEarned, 
+  getFlatTotalCompletedCost, 
+  getFlatBasePrice 
+} from '../utils';
+import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface FlatDetailModalProps {
@@ -16,6 +23,7 @@ interface FlatDetailModalProps {
 export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelete }: FlatDetailModalProps) {
   const [formData, setFormData] = useState<FlatRecord | null>(null);
   const [activeTab, setActiveTab] = useState<MilestoneKey>('frameFixing');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Sync state with selected flat
   useEffect(() => {
@@ -39,16 +47,15 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
     });
   };
 
-  // Toggle subtask within a milestone
-  const handleToggleSubtask = (milestoneKey: MilestoneKey, subtaskKey: string) => {
+  // Change individual checkpoint dropdown option
+  const handleDropdownChange = (milestoneKey: MilestoneKey, subtaskKey: string, newValue: string) => {
     setFormData(prev => {
       if (!prev) return null;
       const milestone = { ...prev[milestoneKey] } as any;
-      const nextVal = !milestone[subtaskKey];
-      milestone[subtaskKey] = nextVal;
+      milestone[subtaskKey] = newValue;
       
-      // Auto assign Done By and timestamp if it is toggled to TRUE and currently blank
-      if (nextVal) {
+      // Auto assign Done By and timestamp if it is updated to something other than not_started
+      if (newValue !== 'not_started') {
         if (!milestone.doneBy) {
           milestone.doneBy = SUPERVISORS[0]; 
         }
@@ -73,7 +80,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
 
       const updatedMilestone = { ...prev[milestoneKey] } as any;
       Object.keys(meta.subtaskLabels).forEach(key => {
-        updatedMilestone[key] = complete;
+        updatedMilestone[key] = complete ? 'approved' : 'not_started';
       });
 
       if (complete) {
@@ -116,6 +123,153 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
     });
   };
 
+  const handleDownloadReport = () => {
+    if (!formData) return;
+    const totalCost = getFlatTotalCompletedCost(formData);
+    const basePrice = getFlatBasePrice(formData);
+    const overallProgress = formData ? Math.round((getTotalSubtaskScore(formData) / 22) * 100) : 0;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups to download this report.");
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Inspection Report - OA# ${formData.oaNo} - Flat ${formData.flatNo}</title>
+        <style>
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1e293b; padding: 40px; line-height: 1.5; }
+          .header { border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+          .title { font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #0f172a; }
+          .meta-grid { display: grid; grid-template-cols: repeat(4, 1fr); gap: 20px; background: #f1f5f9; padding: 20px; border-radius: 12px; margin-bottom: 30px; }
+          .meta-item { display: flex; flex-direction: column; }
+          .meta-label { font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+          .meta-val { font-size: 14px; font-weight: bold; color: #0f172a; }
+          .financials { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 35px; }
+          .fin-card { flex: 1; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px 20px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+          .fin-title { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+          .fin-val { font-size: 20px; font-weight: bold; color: #2563eb; }
+          .stage { margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+          .stage-header { background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+          .stage-title { font-size: 13px; font-weight: bold; color: #01172a; }
+          .stage-pct { font-size: 12px; font-weight: bold; color: #2563eb; }
+          .checkpoint-list { padding: 15px 20px; display: grid; grid-template-cols: 1fr 1fr; gap: 12px; background: #fff; }
+          .checkpoint-item { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; font-size: 11px; }
+          .checkpoint-name { color: #475569; }
+          .checkpoint-status { font-weight: bold; font-size: 10px; padding: 3px 8px; border-radius: 8px; text-transform: uppercase; }
+          .not_started { background: #cbd5e1; color: #334155; }
+          .completed { background: #dbeafe; color: #1e40af; }
+          .approved { background: #d1fae5; color: #065f46; }
+          .approved_remarks { background: #ccfbf1; color: #0f766e; }
+          .repair_reqd { background: #fef3c7; color: #92400e; }
+          .rework_needed { background: #ffedd5; color: #9a3412; }
+          .not_approved { background: #fee2e2; color: #991b1b; }
+          .rejected { background: #fca5a5; color: #7f1d1d; }
+          .handed_over { background: #ede9fe; color: #5b21b6; }
+          .footer { text-align: center; color: #94a3b8; font-size: 10px; margin-top: 50px; border-top: 1px solid #f1f5f9; padding-top: 15px; }
+          @media print {
+            body { padding: 0; font-size: 10pt; }
+            button { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <button onclick="window.print()" style="background:#0f172a; color:#fff; border:none; padding:10px 20px; font-weight:bold; border-radius:8px; cursor:pointer;">Print / Save PDF</button>
+          <button onclick="window.close()" style="background:#fff; color:#0f172a; border:1px solid #ccc; padding:10px 20px; font-weight:bold; border-radius:8px; cursor:pointer;">Close Tab</button>
+        </div>
+        <div class="header">
+          <div>
+            <div style="font-size: 11px; font-weight: bold; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">Tufwud Door Installation Systems</div>
+            <div class="title">Opening Inspection Certificate</div>
+          </div>
+          <div style="text-align: right; font-style: italic; font-size: 11px; color: #64748b;">
+            Generated: ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item"><span class="meta-label">OA Number</span><span class="meta-val">${formData.oaNo}</span></div>
+          <div class="meta-item"><span class="meta-label">Tower ID</span><span class="meta-val">${formData.towerId}</span></div>
+          <div class="meta-item"><span class="meta-label">Floor / Flat</span><span class="meta-val">Level ${formData.floor} / Room ${formData.flatNo}</span></div>
+          <div class="meta-item"><span class="meta-label">Door Specification</span><span class="meta-val">${formData.doorName}</span></div>
+        </div>
+
+        <div class="financials">
+          <div class="fin-card">
+            <div class="fin-title">Overall Quality Compliance Progress</div>
+            <div class="fin-val" style="color:#10b981">${overallProgress}%</div>
+          </div>
+          <div class="fin-card">
+            <div class="fin-title">Contract Cost (Base target)</div>
+            <div class="fin-val">₹${basePrice.toLocaleString()}</div>
+          </div>
+          <div class="fin-card">
+            <div class="fin-title">Earned Progress Value</div>
+            <div class="fin-val" style="color:#2563eb">₹${totalCost.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div style="font-size:14px; font-weight:bold; margin-bottom:15px; color:#0f172a; text-transform: uppercase;">Checkpoint Compliance Details</div>
+
+        ${MILESTONES.map(milestone => {
+          const mProgress = getMilestoneProgress(formData, milestone.key);
+          const activeStageData = formData[milestone.key] as any;
+          return `
+            <div class="stage">
+              <div class="stage-header">
+                <span class="stage-title">${milestone.label}</span>
+                <span class="stage-pct">Substage Completion: ${mProgress}% &bull; Inspector: ${activeStageData.doneBy || 'Unassigned'}</span>
+              </div>
+              <div class="checkpoint-list">
+                ${Object.keys(milestone.subtaskLabels).map(taskKey => {
+                  const stateKey = getSubtaskState(activeStageData[taskKey]);
+                  const optionDetails = QUALITATIVE_CHOICES[stateKey] || QUALITATIVE_CHOICES['not_started'];
+                  const label = milestone.subtaskLabels[taskKey];
+                  return `
+                    <div class="checkpoint-item">
+                      <span class="checkpoint-name">${label}</span>
+                      <span class="checkpoint-status" style="background:${optionDetails.color.includes('bg-emerald') ? '#d1fae5' : optionDetails.color.includes('bg-blue') ? '#dbeafe' : optionDetails.color.includes('bg-indigo') ? '#ede9fe' : optionDetails.color.includes('bg-amber') ? '#fef3c7' : optionDetails.color.includes('bg-orange') ? '#ffedd5' : optionDetails.color.includes('bg-rose-100') ? '#fee2e2' : '#f1f5f9'}; color:${optionDetails.color.includes('text-emerald') ? '#065f46' : optionDetails.color.includes('text-blue') ? '#1e40af' : optionDetails.color.includes('text-indigo') ? '#5b21b6' : optionDetails.color.includes('text-amber') ? '#92400e' : optionDetails.color.includes('text-orange') ? '#9a3412' : optionDetails.color.includes('text-rose') ? '#991b1b' : '#334155'};">${optionDetails.label}</span>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            </div>
+          `;
+        }).join("")}
+
+        <div class="footer">
+          Official Inspection Certificate &copy; ${new Date().getFullYear()} Tufwud. Validated digitally.
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  // Helper score calculator purely for layout checks
+  const getTotalSubtaskScore = (f: FlatRecord): number => {
+    const fetchWeight = (val: any) => {
+      if (val === undefined || val === null) return 0;
+      if (typeof val === 'boolean') return val ? 1.0 : 0.0;
+      const chc = QUALITATIVE_CHOICES[val as QualitativeState];
+      return chc ? chc.weight : 0;
+    };
+    let score = 0;
+    MILESTONES.forEach(milestone => {
+      const activeStageData = f[milestone.key] as any;
+      Object.keys(milestone.subtaskLabels).forEach(subKey => {
+        score += fetchWeight(activeStageData[subKey]);
+      });
+    });
+    return Math.max(0, score);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData) {
@@ -152,6 +306,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
             </h2>
           </div>
           <button 
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 transition text-zinc-500 hover:text-zinc-800"
           >
@@ -186,7 +341,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                   name="towerId"
                   value={formData.towerId}
                   onChange={handleMetaChange}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-zinc-500 font-medium"
+                  className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-zinc-500 font-medium bg-white"
                 >
                   {TOWERS_LIST.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -218,6 +373,28 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                   required
                 />
               </div>
+
+              {/* SECTION: Put Price Setup */}
+              <div className="col-span-2">
+                <label className="block text-xs font-bold text-zinc-600 mb-1">Opening Budget / Contract Price (₹)</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 text-xs text-zinc-400 font-bold font-mono">₹</span>
+                  <input
+                    type="number"
+                    value={formData.price !== undefined ? formData.price : 5000}
+                    onChange={(e) => {
+                      const val = Math.max(0, parseFloat(e.target.value) || 0);
+                      setFormData(prev => {
+                        if (!prev) return null;
+                        return { ...prev, price: val };
+                      });
+                    }}
+                    className="w-full pl-8 pr-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-zinc-500 font-bold font-mono text-zinc-800"
+                    placeholder="e.g. 5000"
+                    min="0"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -226,10 +403,45 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                 name="doorName"
                 value={formData.doorName}
                 onChange={handleMetaChange}
-                className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-zinc-500 font-medium"
+                className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-zinc-500 font-medium bg-white"
               >
                 {DOOR_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
+            </div>
+          </div>
+
+          {/* New Financial Breakdowns list per Flat (Visual Aid) */}
+          <div className="mt-4 bg-zinc-50 border border-zinc-200 rounded-2xl p-4 space-y-2">
+            <div className="flex justify-between items-center text-xs font-extrabold text-zinc-800 uppercase tracking-tight pb-1.5 border-b border-zinc-200">
+              <span>Financial Stages Breakdown (Percentage)</span>
+              <span className="font-mono text-indigo-700">₹{getFlatTotalCompletedCost(formData).toLocaleString()} Earned</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {[
+                { id: "frame_install", label: "Frame Install (20%)", color: "bg-emerald-500" },
+                { id: "shutter_install", label: "Shutter Install (30%)", color: "bg-blue-500" },
+                { id: "hardware", label: "Hardware (10%)", color: "bg-pink-500" },
+                { id: "architrave", label: "Architrave (10%)", color: "bg-amber-500" },
+                { id: "seals_foams", label: "Seals & Foams (10%)", color: "bg-teal-500" },
+                { id: "handover", label: "Handover (20%)", color: "bg-indigo-500" }
+              ].map(stg => {
+                const pctVal = getFinancialStageProgress(formData, stg.id);
+                const earnedPrice = getFinancialStageEarned(formData, stg.id);
+                return (
+                  <div key={stg.id} className="bg-white p-2 border border-zinc-150 rounded-xl space-y-1">
+                    <div className="flex justify-between text-[10px] font-bold text-zinc-650">
+                      <span className="truncate">{stg.label}</span>
+                      <span className="font-mono text-zinc-900">{pctVal}%</span>
+                    </div>
+                    <div className="w-full bg-zinc-100 h-1 rounded-full overflow-hidden">
+                      <div className={`h-full ${stg.color}`} style={{ width: `${pctVal}%` }} />
+                    </div>
+                    <div className="text-[9px] text-indigo-600 text-right font-black font-mono">
+                      ₹{earnedPrice.toLocaleString()}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -278,7 +490,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                       onClick={() => handleStageBulkUpdate(activeTab, true)}
                       className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase"
                     >
-                      Fill All
+                      Fill All Approved
                     </button>
                     <span className="text-zinc-300">|</span>
                     <button
@@ -298,35 +510,32 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                   const activeStageData = formData[activeTab] as any;
 
                   return Object.keys(meta.subtaskLabels).map(taskKey => {
-                    const isPassed = activeStageData[taskKey] === true;
+                    const currentStateKey = getSubtaskState(activeStageData[taskKey]);
+                    const currentChoice = QUALITATIVE_CHOICES[currentStateKey] || QUALITATIVE_CHOICES['not_started'];
+                    
                     return (
-                      <button
+                      <div
                         key={taskKey}
-                        type="button"
-                        onClick={() => handleToggleSubtask(activeTab, taskKey)}
-                        className={`w-full text-left p-3 rounded-xl border transition flex items-center justify-between ${
-                          isPassed 
-                            ? "bg-emerald-50/50 border-emerald-200 hover:bg-emerald-50 text-emerald-950" 
-                            : "bg-white border-zinc-200 hover:bg-zinc-50 text-zinc-700"
-                        }`}
-                        style={{ minHeight: '44px' }} // Touch safe
+                        className="p-3.5 rounded-xl border bg-white border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm hover:border-zinc-300 transition"
                       >
-                        <span className="text-xs font-semibold leading-relaxed">
+                        <span className="text-xs font-semibold text-zinc-700 leading-relaxed max-w-xs">
                           {meta.subtaskLabels[taskKey]}
                         </span>
                         
-                        <div>
-                          {isPassed ? (
-                            <div className="p-1 rounded-full bg-emerald-500 text-white">
-                              <CheckSquare className="w-4 h-4" />
-                            </div>
-                          ) : (
-                            <div className="text-zinc-300">
-                              <Square className="w-5 h-5" />
-                            </div>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={currentStateKey}
+                            onChange={(e) => handleDropdownChange(activeTab, taskKey, e.target.value)}
+                            className={`px-3 py-1.5 border rounded-xl text-xs font-bold focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer ${currentChoice.color}`}
+                          >
+                            {Object.values(QUALITATIVE_CHOICES).map(choice => (
+                              <option key={choice.key} value={choice.key} className="bg-white text-zinc-800 font-medium">
+                                {choice.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      </button>
+                      </div>
                     );
                   });
                 })()}
@@ -369,20 +578,27 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
 
         {/* Action Buttons */}
         <div className="p-6 border-t border-zinc-100 bg-zinc-50 flex items-center justify-between gap-4">
-          <div>
+          <div className="flex items-center gap-2">
             {formData.id !== 'NEW' && onDelete && (
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm("Are you sure you want to delete this flat opening log?")) {
-                    onDelete(formData.id);
-                    onClose();
-                  }
-                }}
-                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition flex items-center gap-1.5"
+                onClick={() => setConfirmingDelete(true)}
+                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-bold rounded-xl border border-rose-200 transition flex items-center gap-1.5"
               >
                 <Trash2 className="w-4 h-4" />
                 Remove
+              </button>
+            )}
+
+            {/* Download Certificate */}
+            {formData.id !== 'NEW' && (
+              <button
+                type="button"
+                onClick={handleDownloadReport}
+                className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 text-xs font-bold rounded-xl border border-indigo-200 transition flex items-center gap-1.5 shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download PDF Certificate
               </button>
             )}
           </div>
@@ -406,6 +622,48 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
           </div>
         </div>
       </motion.div>
+
+      {/* Custom Modal Confirmation for Single Room Log Delete */}
+      {confirmingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-[2px] animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-650">
+              <div className="p-2 bg-rose-50 rounded-xl border border-rose-100">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <h3 className="font-extrabold text-zinc-900 text-base leading-tight font-sans">Delete Opening Log?</h3>
+            </div>
+            
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Are you sure you want to delete this flat opening log? This action cannot be easily undone.
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDelete) {
+                    onDelete(formData.id);
+                  }
+                  onClose();
+                  setConfirmingDelete(false);
+                }}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs rounded-xl transition duration-150 shadow-sm cursor-pointer"
+              >
+                Yes, Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold text-xs rounded-xl border border-zinc-200 transition duration-150 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

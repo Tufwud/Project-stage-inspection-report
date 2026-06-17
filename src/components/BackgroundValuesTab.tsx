@@ -12,16 +12,19 @@ interface BackgroundValuesTabProps {
     totalFloors: number;
     flatsPerFloor: number;
     doorTypesToGenerate: string[];
+    defaultPrice?: number;
   }) => void;
   onClearTower: (towerId: string) => void;
+  onWipeAll?: () => void;
 }
 
-export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTower }: BackgroundValuesTabProps) {
+export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTower, onWipeAll }: BackgroundValuesTabProps) {
   // exact state corresponding to the supervisor form in the screenshot
   const [salesOrderNo, setSalesOrderNo] = useState('');
   const [towerId, setTowerId] = useState('');
   const [totalFloors, setTotalFloors] = useState('');
   const [flatsPerFloor, setFlatsPerFloor] = useState('');
+  const [defaultPrice, setDefaultPrice] = useState('5000');
 
   const [customDoorCodes, setCustomDoorCodes] = useState('A, B, C');
   const [useCustomCodes, setUseCustomCodes] = useState(true);
@@ -33,6 +36,10 @@ export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTow
 
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Custom non-blocking confirmation states
+  const [towerToWipe, setTowerToWipe] = useState<string | null>(null);
+  const [confirmWipeAll, setConfirmWipeAll] = useState(false);
 
   // Group current loaded data to show "Fetched Background Values"
   const getTowerBreakdown = () => {
@@ -69,6 +76,7 @@ export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTow
     setTowerId('');
     setTotalFloors('');
     setFlatsPerFloor('');
+    setDefaultPrice('5000');
     setFormError(null);
   };
 
@@ -115,7 +123,8 @@ export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTow
       towerId: towerId.trim(),
       totalFloors: floorsNum,
       flatsPerFloor: flatsPerFloorNum,
-      doorTypesToGenerate: doorTypesToGenerate
+      doorTypesToGenerate: doorTypesToGenerate,
+      defaultPrice: parseFloat(defaultPrice) || 5000
     });
 
     setSuccessBanner(`Fetched Background Values! Created structure config for ${towerId} successfully.`);
@@ -222,6 +231,24 @@ export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTow
                 placeholder="e.g. 4"
                 className="w-full px-3.5 py-2.5 bg-white border border-zinc-200 rounded-lg text-sm font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
               />
+            </div>
+
+            {/* Field E: Contract Price per Door */}
+            <div className="space-y-1.5">
+              <label className="block text-[13px] font-semibold text-zinc-600 font-sans">
+                Price per Opening (₹)<span className="text-blue-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-sm text-zinc-400 font-bold font-mono">₹</span>
+                <input
+                  type="text"
+                  value={defaultPrice}
+                  onChange={(e) => setDefaultPrice(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 5000"
+                  className="w-full pl-7 pr-3.5 py-2.5 bg-white border border-zinc-200 rounded-lg text-sm font-semibold font-mono text-zinc-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                  required
+                />
+              </div>
             </div>
 
             {/* Generative Add-on: Selected doors to auto generate */}
@@ -391,8 +418,20 @@ export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTow
           )}
 
           <div className="space-y-4">
-            <div className="text-xs font-bold uppercase tracking-widest text-zinc-400">
-              Active Tower Structure Parameters
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                Active Tower Structure Parameters
+              </div>
+              {onWipeAll && flats.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmWipeAll(true)}
+                  className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-500 rounded-md border border-rose-200 hover:border-transparent transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Wipe All Records
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -419,15 +458,11 @@ export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTow
                           </h4>
                         </div>
                         
-                        {/* Remove whole tower */}
+                        {/* Remove whole tower - permanently visible */}
                         <button
                           type="button"
-                          onClick={() => {
-                            if (confirm(`Do you wish to delete ALL openings checklists generated for ${towerName}?`)) {
-                              onClearTower(towerName);
-                            }
-                          }}
-                          className="p-1 px-2 text-xs font-bold text-rose-600 hover:text-white hover:bg-rose-500 rounded-lg border border-rose-100 hover:border-transparent transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0"
+                          onClick={() => setTowerToWipe(towerName)}
+                          className="p-1 px-2 text-xs font-bold text-rose-600 hover:text-white hover:bg-rose-500 rounded-lg border border-rose-100 hover:border-transparent transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs bg-white"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           Wipe
@@ -480,6 +515,82 @@ export default function BackgroundValuesTab({ flats, onGenerateFlats, onClearTow
         </div>
 
       </div>
+
+      {/* Custom Modal Confirmation for Single Tower Wipe */}
+      {towerToWipe && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-[2px] animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-650">
+              <div className="p-2 bg-rose-50 rounded-xl border border-rose-100">
+                <Trash2 className="w-5 h-5 text-rose-600" />
+              </div>
+              <h3 className="font-extrabold text-zinc-900 text-base leading-tight">Wipe Tower Openings?</h3>
+            </div>
+            
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Are you sure you want to delete ALL openings checklists generated for <strong className="text-zinc-800">{towerToWipe}</strong>? This action cannot be undone.
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onClearTower(towerToWipe);
+                  setTowerToWipe(null);
+                }}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs rounded-xl transition duration-150 shadow-sm cursor-pointer"
+              >
+                Yes, Wipe Tower
+              </button>
+              <button
+                type="button"
+                onClick={() => setTowerToWipe(null)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold text-xs rounded-xl border border-zinc-200 transition duration-150 cursor-pointer"
+              >
+                No, Keep It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Modal Confirmation for Wiping All Records */}
+      {confirmWipeAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-[2px] animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-650">
+              <div className="p-2 bg-rose-50 rounded-xl border border-rose-100">
+                <Trash2 className="w-5 h-5 text-rose-650" />
+              </div>
+              <h3 className="font-extrabold text-zinc-900 text-base leading-tight">Wipe All Records?</h3>
+            </div>
+            
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Are you sure you want to WIPE all tower settings, doors, and checklists? This action is absolutely destructive and <span className="font-bold text-rose-600">permanently deletes</span> everything!
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onWipeAll) onWipeAll();
+                  setConfirmWipeAll(false);
+                }}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs rounded-xl transition duration-150 shadow-sm cursor-pointer"
+              >
+                Yes, Wipe Everything
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmWipeAll(false)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold text-xs rounded-xl border border-zinc-200 transition duration-150 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

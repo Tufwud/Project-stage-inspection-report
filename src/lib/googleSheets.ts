@@ -1,7 +1,18 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
-import { FlatRecord, MILESTONES } from '../types';
+import { FlatRecord, MILESTONES, QUALITATIVE_CHOICES, QualitativeState } from '../types';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { getFlatBasePrice, getFlatTotalCompletedCost, getFinancialStageEarned } from '../utils';
+
+function renderCellState(val: any): string {
+  if (val === undefined || val === null) return 'Not Started';
+  if (typeof val === 'boolean') return val ? 'Approved' : 'Not Started';
+  if (QUALITATIVE_CHOICES[val as QualitativeState]) {
+    const choice = QUALITATIVE_CHOICES[val as QualitativeState];
+    return choice.label.split(' (')[0];
+  }
+  return String(val);
+}
 
 // Initialize Firebase App
 const app = initializeApp(firebaseConfig);
@@ -66,7 +77,7 @@ export const logout = async () => {
 
 /**
  * Creates a brand new Google Sheet in the user's Google Drive.
- * Has 2 sheets (tabs): "Raw Quality Logs" and "Consolidated Reports".
+ * Has 3 sheets (tabs): "Raw Quality Logs", "Consolidated Reports", and "Stage-wise Cost Breakdown".
  */
 export const createGoogleSheet = async (accessToken: string, title: string): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> => {
   const payload = {
@@ -85,6 +96,14 @@ export const createGoogleSheet = async (accessToken: string, title: string): Pro
       {
         properties: {
           title: 'Consolidated Reports',
+          gridProperties: {
+            frozenRowCount: 1
+          }
+        }
+      },
+      {
+        properties: {
+          title: 'Stage-wise Cost Breakdown',
           gridProperties: {
             frozenRowCount: 1
           }
@@ -238,41 +257,41 @@ export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
       flat.doorName,
 
       // Frame fixing checklist values
-      flat.frameFixing.fastenerFixing,
-      flat.frameFixing.frameLockAreaFinish,
-      flat.frameFixing.outsideArchitraveFixing,
-      flat.frameFixing.insideArchitraveFixing,
+      renderCellState(flat.frameFixing.fastenerFixing),
+      renderCellState(flat.frameFixing.frameLockAreaFinish),
+      renderCellState(flat.frameFixing.outsideArchitraveFixing),
+      renderCellState(flat.frameFixing.insideArchitraveFixing),
       flat.frameFixing.doneBy || 'N/A',
       flat.frameFixing.timestamp ? new Date(flat.frameFixing.timestamp).toLocaleString() : 'N/A',
 
       // Door fixing checklist values
-      flat.doorFixing.shutterEdgeFinishing,
-      flat.doorFixing.gapBetweenFrameAndShutter,
-      flat.doorFixing.iSealFixing,
-      flat.doorFixing.visionGlassBeatFinishing,
+      renderCellState(flat.doorFixing.shutterEdgeFinishing),
+      renderCellState(flat.doorFixing.gapBetweenFrameAndShutter),
+      renderCellState(flat.doorFixing.iSealFixing),
+      renderCellState(flat.doorFixing.visionGlassBeatFinishing),
       flat.doorFixing.doneBy || 'N/A',
       flat.doorFixing.timestamp ? new Date(flat.doorFixing.timestamp).toLocaleString() : 'N/A',
 
       // Hardware fixing checklist values
-      flat.hardwareFixing.hingeFitting,
-      flat.hardwareFixing.lockWithHandleFitting,
-      flat.hardwareFixing.eyeviewInstallation,
-      flat.hardwareFixing.towerBoltInstallation,
-      flat.hardwareFixing.doorCloserInstallation,
-      flat.hardwareFixing.autoDropSealInstallation,
+      renderCellState(flat.hardwareFixing.hingeFitting),
+      renderCellState(flat.hardwareFixing.lockWithHandleFitting),
+      renderCellState(flat.hardwareFixing.eyeviewInstallation),
+      renderCellState(flat.hardwareFixing.towerBoltInstallation),
+      renderCellState(flat.hardwareFixing.doorCloserInstallation),
+      renderCellState(flat.hardwareFixing.autoDropSealInstallation),
       flat.hardwareFixing.doneBy || 'N/A',
       flat.hardwareFixing.timestamp ? new Date(flat.hardwareFixing.timestamp).toLocaleString() : 'N/A',
 
       // Handover checklist values
-      flat.handover.frameCarpatchFillingSanding,
-      flat.handover.frameTouchUp,
-      flat.handover.shutterEdgeFinishing,
-      flat.handover.lockSlotAreaFinishing,
-      flat.handover.shutterTouchUp,
-      flat.handover.hardwareCleaning,
-      flat.handover.plasticCoverRemoval,
-      flat.handover.keysHandover,
-      flat.handover.keysHandover ? 'Supervisor Authorized' : 'Pending',
+      renderCellState(flat.handover.frameCarpatchFillingSanding),
+      renderCellState(flat.handover.frameTouchUp),
+      renderCellState(flat.handover.shutterEdgeFinishing),
+      renderCellState(flat.handover.lockSlotAreaFinishing),
+      renderCellState(flat.handover.shutterTouchUp),
+      renderCellState(flat.handover.hardwareCleaning),
+      renderCellState(flat.handover.plasticCoverRemoval),
+      renderCellState(flat.handover.keysHandover),
+      flat.handover.keysHandover ? 'Supervisor Handed Over' : 'Pending',
       flat.handover.timestamp ? new Date(flat.handover.timestamp).toLocaleString() : 'N/A'
     ];
   });
@@ -382,6 +401,108 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
       status
     ];
   });
+
+  return [headers, ...dataRows];
+};
+
+/**
+ * Format flat records for Stage-wise Cost Breakdown tab (Report C)
+ */
+export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
+  // Group by Tower
+  const stats: { 
+    [towerId: string]: { 
+      towerName: string;
+      totalDoors: number;
+      totalBudget: number;
+      totalEarned: number;
+      stageEarnedSums: { [stageId: string]: number };
+    } 
+  } = {};
+
+  const stagesDef = [
+    { id: "frame_install", label: "Frame Installation (20%)" },
+    { id: "shutter_install", label: "Shutter Installation (30%)" },
+    { id: "hardware", label: "Hardware fitting (10%)" },
+    { id: "architrave", label: "Architrave (10%)" },
+    { id: "seals_foams", label: "Seals & Foams (10%)" },
+    { id: "handover", label: "Handover progress (20%)" }
+  ];
+
+  flats.forEach(flat => {
+    const towerId = flat.towerId;
+    const basePrice = getFlatBasePrice(flat);
+    const completedCost = getFlatTotalCompletedCost(flat);
+
+    if (!stats[towerId]) {
+      const initialStages: { [stageId: string]: number } = {};
+      stagesDef.forEach(s => {
+        initialStages[s.id] = 0;
+      });
+
+      stats[towerId] = {
+        towerName: towerId,
+        totalDoors: 0,
+        totalBudget: 0,
+        totalEarned: 0,
+        stageEarnedSums: initialStages
+      };
+    }
+
+    stats[towerId].totalDoors += 1;
+    stats[towerId].totalBudget += basePrice;
+    stats[towerId].totalEarned += completedCost;
+
+    stagesDef.forEach(stage => {
+      const earned = getFinancialStageEarned(flat, stage.id);
+      stats[towerId].stageEarnedSums[stage.id] += earned;
+    });
+  });
+
+  const headers = [
+    'Project Tower Name',
+    'Total Setup Doors',
+    'Accumulated Budget (INR)',
+    ...stagesDef.map(s => `${s.label} Earned (INR)`),
+    'Grand Cost Earned Amount (INR)',
+    'Financial Delivery Rate %'
+  ];
+
+  const valueSummaries = Object.values(stats);
+
+  const dataRows = valueSummaries.map(t => {
+    const actualDeliveryPct = t.totalBudget > 0 ? Math.min(100, Math.round((t.totalEarned / t.totalBudget) * 100)) : 0;
+    const stageValues = stagesDef.map(s => t.stageEarnedSums[s.id]);
+    
+    return [
+      t.towerName,
+      t.totalDoors,
+      t.totalBudget,
+      ...stageValues,
+      t.totalEarned,
+      `${actualDeliveryPct}%`
+    ];
+  });
+
+  if (valueSummaries.length > 0) {
+    const grandDoors = valueSummaries.reduce((sum, s) => sum + s.totalDoors, 0);
+    const grandBudget = valueSummaries.reduce((sum, s) => sum + s.totalBudget, 0);
+    const grandEarned = valueSummaries.reduce((sum, s) => sum + s.totalEarned, 0);
+    const grandPct = grandBudget > 0 ? Math.round((grandEarned / grandBudget) * 100) : 0;
+
+    const grandStages = stagesDef.map(stage => {
+      return valueSummaries.reduce((sum, s) => sum + s.stageEarnedSums[stage.id], 0);
+    });
+
+    dataRows.push([
+      'GRAND TOTAL',
+      grandDoors,
+      grandBudget,
+      ...grandStages,
+      grandEarned,
+      `${grandPct}%`
+    ]);
+  }
 
   return [headers, ...dataRows];
 };

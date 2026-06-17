@@ -1,18 +1,23 @@
 import React, { useRef, useState } from 'react';
 import { FlatRecord } from '../types';
 import { convertToCSV, parseCSVToFlats } from '../utils';
-import { Download, Upload, RotateCcw, HelpCircle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Download, Upload, RotateCcw, HelpCircle, CheckCircle2, ChevronRight, Trash2 } from 'lucide-react';
 
 interface CsvDataActionsProps {
   onDataImport: (imported: FlatRecord[]) => void;
   onResetData: () => void;
+  onWipeData?: () => void;
   flats: FlatRecord[];
 }
 
-export default function CsvDataActions({ onDataImport, onResetData, flats }: CsvDataActionsProps) {
+export default function CsvDataActions({ onDataImport, onResetData, onWipeData, flats }: CsvDataActionsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Custom non-blocking modal confirmation states
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const [confirmingWipe, setConfirmingWipe] = useState(false);
 
   const handleExport = () => {
     try {
@@ -98,17 +103,23 @@ export default function CsvDataActions({ onDataImport, onResetData, flats }: Csv
 
           {/* Reset button */}
           <button
-            onClick={() => {
-              if (confirm("Reset current records back to mock dashboard presets? This wipes local modifications.")) {
-                onResetData();
-                triggerToast("Dataset reset to simulation factory presets successfully.");
-              }
-            }}
-            className="px-4 py-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-transparent rounded-xl text-xs font-bold transition flex items-center gap-2"
+            onClick={() => setConfirmingReset(true)}
+            className="px-4 py-2 text-zinc-600 hover:text-zinc-705 hover:bg-zinc-50 border border-transparent rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer"
           >
             <RotateCcw className="w-4.5 h-4.5" />
-            Reset Dataset
+            Reset presets
           </button>
+
+          {/* Wipe Clean button */}
+          {onWipeData && (
+            <button
+              onClick={() => setConfirmingWipe(true)}
+              className="px-4 py-2 text-rose-650 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-transparent rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-2xs"
+            >
+              <Trash2 className="w-4.5 h-4.5" />
+              Wipe Clean
+            </button>
+          )}
         </div>
       </div>
 
@@ -143,6 +154,87 @@ export default function CsvDataActions({ onDataImport, onResetData, flats }: Csv
           </p>
         </div>
       </div>
+
+      {/* Custom Modal Confirmation for presets reset */}
+      {confirmingReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-[2px] animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center gap-3 text-indigo-600">
+              <div className="p-2 bg-indigo-50 rounded-xl border border-indigo-100">
+                <RotateCcw className="w-5 h-5 text-indigo-600" />
+              </div>
+              <h3 className="font-extrabold text-zinc-900 text-base leading-tight font-sans">Reset presets?</h3>
+            </div>
+            
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Are you sure you want to reset current records back to mock dashboard presets? This will wipe all local modifications.
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onResetData();
+                  triggerToast("Dataset reset to simulation factory presets successfully.");
+                  setConfirmingReset(false);
+                }}
+                className="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs rounded-xl transition duration-150 shadow-sm cursor-pointer"
+              >
+                Yes, Reset Data
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingReset(false)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold text-xs rounded-xl border border-zinc-200 transition duration-150 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Modal Confirmation for main DB Wipe */}
+      {confirmingWipe && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-[2px] animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-650">
+              <div className="p-2 bg-rose-50 rounded-xl border border-rose-100">
+                <Trash2 className="w-5 h-5 text-rose-650" />
+              </div>
+              <h3 className="font-extrabold text-zinc-900 text-base leading-tight font-sans">Wipe Database?</h3>
+            </div>
+            
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Are you sure you want to WIPE the current database? This permanently deletes all door records, and cannot be undone.
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onWipeData) {
+                    onWipeData();
+                  }
+                  triggerToast("Database wiped clean successfully. Ready for custom tower input.");
+                  setConfirmingWipe(false);
+                }}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs rounded-xl transition duration-150 shadow-sm cursor-pointer"
+              >
+                Yes, Wipe Clean
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingWipe(false)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold text-xs rounded-xl border border-zinc-200 transition duration-150 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
