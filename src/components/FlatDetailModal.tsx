@@ -39,7 +39,19 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
   // Sync state with selected flat
   useEffect(() => {
     if (flat) {
-      setFormData(JSON.parse(JSON.stringify(flat))); // Deep clone
+      const cloned = JSON.parse(JSON.stringify(flat));
+      // Ensure contractor defaults to "Prabir Dhol" and Inspector/doneBy to "Aarif Taslim" if blank but editable
+      ['frameFixing', 'doorFixing', 'hardwareFixing', 'handover'].forEach(key => {
+        if (cloned[key]) {
+          if (!cloned[key].contractor) {
+            cloned[key].contractor = "Prabir Dhol";
+          }
+          if (!cloned[key].doneBy) {
+            cloned[key].doneBy = "Aarif Taslim";
+          }
+        }
+      });
+      setFormData(cloned);
     } else {
       setFormData(null);
     }

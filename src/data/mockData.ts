@@ -694,12 +694,17 @@ export const DEFAULT_FLATS: FlatRecord[] = [
 ];
 
 export const SUPERVISORS = [
-  "Rajesh Kumar",
-  "Amit Roy",
-  "Sanjay Dutta",
-  "Vijay M.",
-  "Karan Singh",
-  "Madan Lal"
+  "Aarif Taslim",
+  "Vivek Laxman",
+  "Sandip Vishwakarma",
+  "Nagesh Yadav",
+  "Surya Pratap Singh",
+  "Radheshyam",
+  "Rahul Sharma",
+  "Ramanpreet Singh",
+  "Arunava Samadder",
+  "Niranjan Das",
+  "Indraj Meghwal"
 ];
 
 export const TOWERS_LIST = [
