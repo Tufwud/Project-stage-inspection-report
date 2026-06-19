@@ -9,7 +9,7 @@ import {
   getFlatTotalCompletedCost, 
   getFlatBasePrice 
 } from '../utils';
-import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download } from 'lucide-react';
+import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download, Hammer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Helper to get local timestamp in YYYY-MM-DDTHH:mm format
@@ -429,12 +429,12 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {[
-                { id: "frame_install", label: "Frame Install (20%)", color: "bg-emerald-500" },
+                { id: "frame_install", label: "Frame Install (0%)", color: "bg-emerald-500" },
                 { id: "shutter_install", label: "Shutter Install (30%)", color: "bg-blue-500" },
                 { id: "hardware", label: "Hardware (10%)", color: "bg-pink-500" },
-                { id: "architrave", label: "Architrave (10%)", color: "bg-amber-500" },
-                { id: "seals_foams", label: "Seals & Foams (10%)", color: "bg-teal-500" },
-                { id: "handover", label: "Handover (20%)", color: "bg-indigo-500" }
+                { id: "architrave", label: "Architect (10%)", color: "bg-amber-500" },
+                { id: "seals_foams", label: "Sales/Forms (10%)", color: "bg-teal-500" },
+                { id: "handover", label: "Handover (8%)", color: "bg-indigo-500" }
               ].map(stg => {
                 const pctVal = getFinancialStageProgress(formData, stg.id);
                 const earnedPrice = getFinancialStageEarned(formData, stg.id);
@@ -524,24 +524,53 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                     const currentStateKey = getSubtaskState(activeStageData[taskKey]);
                     const currentChoice = QUALITATIVE_CHOICES[currentStateKey] || QUALITATIVE_CHOICES['not_started'];
                     
+                    // Format score representation label
+                    const getMetricLabel = (chc: any) => {
+                      if (chc.key === 'not_started') return '0%';
+                      if (chc.key === 'not_approved') return '0%';
+                      if (chc.key === 'completed') return '50%';
+                      if (chc.key === 'rework_needed') return '50%';
+                      if (chc.key === 'repair_reqd') return '60%';
+                      if (chc.key === 'approved_remarks') return '80%';
+                      if (chc.key === 'approved') return '100%';
+                      if (chc.key === 'handed_over') return '100% (1)';
+                      if (chc.key === 'rejected') return '-50%';
+                      return `${Math.round(chc.weight * 100)}%`;
+                    };
+
+                    const getMetricColor = (chc: any) => {
+                      if (chc.weight >= 1.0) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                      if (chc.weight >= 0.8) return 'bg-teal-100 text-teal-850 border-teal-200';
+                      if (chc.weight >= 0.5) return 'bg-amber-100 text-amber-800 border-amber-200';
+                      if (chc.weight === 0.0) return 'bg-zinc-100 text-zinc-650 border-zinc-250';
+                      if (chc.weight < 0.0) return 'bg-rose-100 text-rose-800 border-rose-200';
+                      return 'bg-zinc-100 border-zinc-200 text-zinc-650';
+                    };
+
                     return (
                       <div
                         key={taskKey}
                         className="p-3.5 rounded-xl border bg-white border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm hover:border-zinc-300 transition"
                       >
-                        <span className="text-xs font-semibold text-zinc-700 leading-relaxed max-w-xs">
+                        <span className="text-xs font-semibold text-zinc-700 leading-relaxed max-w-xs md:max-w-md">
                           {meta.subtaskLabels[taskKey]}
                         </span>
                         
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 xs:gap-2 self-start sm:self-auto shrink-0">
+                          {/* Compliance Score Badge */}
+                          <div className={`hidden xs:inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-black font-mono shrink-0 shadow-3xs ${getMetricColor(currentChoice)}`}>
+                            <span className="text-zinc-400 font-semibold uppercase tracking-wider text-[8px]">Value:</span>
+                            {getMetricLabel(currentChoice)}
+                          </div>
+
                           <select
                             value={currentStateKey}
                             onChange={(e) => handleDropdownChange(activeTab, taskKey, e.target.value)}
-                            className={`w-full sm:w-auto max-w-[150px] xs:max-w-[200px] sm:max-w-[250px] md:max-w-xs truncate px-3 py-1.5 border rounded-xl text-xs font-bold focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer ${currentChoice.color}`}
+                            className={`w-full sm:w-auto max-w-[170px] xs:max-w-[210px] sm:max-w-[250px] md:max-w-xs truncate px-3 py-1.5 border rounded-xl text-xs font-bold focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer ${currentChoice.color}`}
                           >
                             {Object.values(QUALITATIVE_CHOICES).map(choice => (
                               <option key={choice.key} value={choice.key} className="bg-white text-zinc-800 font-medium">
-                                {choice.label}
+                                ({getMetricLabel(choice)}) {choice.label}
                               </option>
                             ))}
                           </select>
@@ -552,21 +581,47 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                 })()}
               </div>
 
-              {/* Personnel Assigned & Timestamps */}
-              <div className="pt-4 border-t border-zinc-200/50 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Personnel Assigned, Contractor & Timestamps */}
+              <div className="pt-4 border-t border-zinc-200/50 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-bold text-zinc-600 mb-1 flex items-center gap-1">
                     <User className="w-3.5 h-3.5 text-zinc-400" />
                     Inspected By
                   </label>
                   <select
-                    value={formData[activeTab].doneBy}
+                    value={formData[activeTab].doneBy || ""}
                     onChange={(e) => handleWorkerChange(activeTab, e.target.value)}
                     className="w-full mt-1 px-3 py-1.5 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 bg-white font-medium"
                   >
                     <option value="">-- Unassigned --</option>
                     {SUPERVISORS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-zinc-600 mb-1 flex items-center gap-1">
+                    <Hammer className="w-3.5 h-3.5 text-zinc-400" />
+                    Contractor Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData[activeTab].contractor || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData(prev => {
+                        if (!prev) return null;
+                        return {
+                          ...prev,
+                          [activeTab]: {
+                            ...prev[activeTab],
+                            contractor: val
+                          }
+                        };
+                      });
+                    }}
+                    placeholder="e.g. Fine Wood Ltd"
+                    className="w-full mt-1 px-3 py-1.5 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 bg-white font-medium"
+                  />
                 </div>
 
                 <div>

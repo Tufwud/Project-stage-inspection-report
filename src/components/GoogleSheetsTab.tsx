@@ -202,6 +202,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
   const getPreviewConsolidatedData = () => {
     const headers = [
       'Sales Order No',
+      'SO Details',
       'Total Rooms',
       'Frame Fixing Rate',
       'Door Fixing Rate',
@@ -219,6 +220,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
     const rows = Object.keys(oaGroups).map(oaNo => {
       const list = oaGroups[oaNo];
       const count = list.length;
+      const soDetails = list[0]?.soDetails || '';
       
       let tf = 0, td = 0, th = 0, tho = 0;
       list.forEach(flat => {
@@ -236,6 +238,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
 
       return {
         oaNo,
+        soDetails,
         count,
         framePct,
         doorPct,
@@ -587,6 +590,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
                     {previewData.rows.map((row, index) => (
                       <tr key={index} className="hover:bg-zinc-50/50 transition">
                         <td className="py-3 px-3 font-bold text-zinc-900 font-mono">{row.oaNo}</td>
+                        <td className="py-3 px-3 max-w-[150px] truncate text-zinc-650 font-medium" title={row.soDetails}>{row.soDetails || <em className="text-zinc-400">N/A</em>}</td>
                         <td className="py-3 px-3">{row.count} rooms</td>
                         <td className="py-3 px-3">
                           <div className="space-y-1">
@@ -629,7 +633,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
                     ))}
                     {previewData.rows.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-zinc-400 font-semibold select-none">
+                        <td colSpan={8} className="py-8 text-center text-zinc-400 font-semibold select-none">
                           No active checklist records tracked to build report previews.
                         </td>
                       </tr>

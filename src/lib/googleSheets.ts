@@ -315,6 +315,7 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
   // Header Row
   const headers = [
     'Sales Order / OA No',
+    'SO Details',
     'Total Active Rooms',
     'Frame Fixing Done (Rooms)',
     'Frame Fixing Progress %',
@@ -332,7 +333,8 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
   const dataRows = Object.keys(oaGroups).map(oaNo => {
     const list = oaGroups[oaNo];
     const totalRooms = list.length;
-    if (totalRooms === 0) return [oaNo, 0, 0, '0%', 0, '0%', 0, '0%', 0, '0%', '0%', 0, 'Inactive'];
+    const soDetailsVal = list[0]?.soDetails || '';
+    if (totalRooms === 0) return [oaNo, soDetailsVal, 0, '0%', 0, '0%', 0, '0%', 0, '0%', '0%', 0, 'Inactive'];
 
     // Calculators
     let frameDoneCount = 0;
@@ -387,6 +389,7 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
 
     return [
       oaNo,
+      soDetailsVal,
       totalRooms,
       `${frameDoneCount} of ${totalRooms}`,
       `${framePercent}%`,
@@ -421,12 +424,12 @@ export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
   } = {};
 
   const stagesDef = [
-    { id: "frame_install", label: "Frame Installation (20%)" },
+    { id: "frame_install", label: "Frame Installation (0%)" },
     { id: "shutter_install", label: "Shutter Installation (30%)" },
-    { id: "hardware", label: "Hardware fitting (10%)" },
-    { id: "architrave", label: "Architrave (10%)" },
-    { id: "seals_foams", label: "Seals & Foams (10%)" },
-    { id: "handover", label: "Handover progress (20%)" }
+    { id: "hardware", label: "Hardware Fitting (10%)" },
+    { id: "architrave", label: "Architect (10%)" },
+    { id: "seals_foams", label: "Sales/Forms (10%)" },
+    { id: "handover", label: "Handover (8%)" }
   ];
 
   flats.forEach(flat => {

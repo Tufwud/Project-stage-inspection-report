@@ -39,7 +39,7 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
   {
     id: "frame_install",
     label: "Frame Installation",
-    pct: 20,
+    pct: 0,
     checkpoints: [
       { milestone: 'frameFixing', key: 'fastenerFixing' },
       { milestone: 'frameFixing', key: 'frameLockAreaFinish' },
@@ -69,7 +69,7 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
   },
   {
     id: "architrave",
-    label: "Architrave",
+    label: "Architect",
     pct: 10,
     checkpoints: [
       { milestone: 'frameFixing', key: 'outsideArchitraveFixing' },
@@ -78,7 +78,7 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
   },
   {
     id: "seals_foams",
-    label: "Seals and Foams",
+    label: "Sales/Forms",
     pct: 10,
     checkpoints: [
       { milestone: 'doorFixing', key: 'iSealFixing' },
@@ -88,7 +88,7 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
   {
     id: "handover",
     label: "Handover",
-    pct: 20,
+    pct: 8,
     checkpoints: [
       { milestone: 'handover', key: 'frameCarpatchFillingSanding' },
       { milestone: 'handover', key: 'frameTouchUp' },

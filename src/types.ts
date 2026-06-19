@@ -7,7 +7,8 @@ export type QualitativeState =
   | 'rework_needed' 
   | 'not_approved' 
   | 'rejected' 
-  | 'handed_over';
+  | 'handed_over'
+  | 'not_applicable';
 
 export interface QualitativeChoice {
   key: QualitativeState;
@@ -23,6 +24,12 @@ export const QUALITATIVE_CHOICES: { [key in QualitativeState]: QualitativeChoice
     weight: 0.0, 
     color: "bg-zinc-100 text-zinc-650 border-zinc-200" 
   },
+  not_applicable: {
+    key: 'not_applicable',
+    label: "Not Applicable (N/A)",
+    weight: 1.0,
+    color: "bg-zinc-100 text-zinc-400 border-zinc-200 line-through decoration-zinc-300"
+  },
   completed: { 
     key: 'completed', 
     label: "Completed (The work is ready for inspection)", 
@@ -31,7 +38,7 @@ export const QUALITATIVE_CHOICES: { [key in QualitativeState]: QualitativeChoice
   },
   approved: { 
     key: 'approved', 
-    label: "Approved (Fully satisfactory outcome)", 
+    label: "N/A- Approved (Fully satisfactory outcome)", 
     weight: 1.0, 
     color: "bg-emerald-50 text-emerald-800 border-emerald-250" 
   },
@@ -79,6 +86,7 @@ export interface FrameFixingChecklist {
   outsideArchitraveFixing: boolean | QualitativeState;
   insideArchitraveFixing: boolean | QualitativeState;
   doneBy: string;
+  contractor?: string;
   timestamp: string; // ISO string or empty
 }
 
@@ -88,6 +96,7 @@ export interface DoorFixingChecklist {
   iSealFixing: boolean | QualitativeState;
   visionGlassBeatFinishing: boolean | QualitativeState;
   doneBy: string;
+  contractor?: string;
   timestamp: string;
 }
 
@@ -99,6 +108,7 @@ export interface HardwareFixingChecklist {
   doorCloserInstallation: boolean | QualitativeState;
   autoDropSealInstallation: boolean | QualitativeState;
   doneBy: string;
+  contractor?: string;
   timestamp: string;
 }
 
@@ -111,12 +121,15 @@ export interface HandoverChecklist {
   hardwareCleaning: boolean | QualitativeState;
   plasticCoverRemoval: boolean | QualitativeState;
   keysHandover: boolean | QualitativeState;
+  doneBy?: string;
+  contractor?: string;
   timestamp: string;
 }
 
 export interface FlatRecord {
   id: string; // ID from data
   oaNo: string; // OA No
+  soDetails?: string; // SO Details / Description
   towerId: string; // Tower ID (e.g., T-01, T-02)
   flatsPerFloor: number; // Flats/Floor
   floor: number; // Floor (e.g., 1, 2, 3...)
@@ -192,3 +205,16 @@ export const MILESTONES: MilestoneMeta[] = [
     }
   }
 ];
+
+export interface SavedProject {
+  salesOrderNo: string;
+  soDetails?: string;
+  flats: FlatRecord[];
+  timestamp: string;
+  numTowers: number;
+  totalFloors: number;
+  flatsPerFloor: number;
+  doorTypesToGenerate: string[];
+  doorPrices: { [code: string]: number };
+}
+

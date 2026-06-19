@@ -35,6 +35,10 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
   const [sortField, setSortField] = useState<SortField>('flatNo');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
+  // Contractor stage-wise state filters for Detailed report
+  const [contractorSearch, setContractorSearch] = useState('');
+  const [contractorStage, setContractorStage] = useState<'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover'>('any');
+
   if (flats.length === 0) {
     return (
       <div className="bg-white rounded-3xl border border-zinc-200 p-12 text-center max-w-lg mx-auto shadow-md space-y-6">
@@ -162,7 +166,23 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
       const matchTower = selectedTower === 'All' || flat.towerId === selectedTower;
       const matchFloor = selectedFloor === 'All' || flat.floor === parseInt(selectedFloor);
 
-      return matchSearch && matchTower && matchFloor;
+      let matchContractor = true;
+      if (contractorSearch.trim()) {
+        const q = contractorSearch.toLowerCase();
+        if (contractorStage === 'any') {
+          const c1 = (flat.frameFixing?.contractor || '').toLowerCase();
+          const c2 = (flat.doorFixing?.contractor || '').toLowerCase();
+          const c3 = (flat.hardwareFixing?.contractor || '').toLowerCase();
+          const c4 = (flat.handover?.contractor || '').toLowerCase();
+          matchContractor = c1.includes(q) || c2.includes(q) || c3.includes(q) || c4.includes(q);
+        } else {
+          const targetSection = flat[contractorStage];
+          const stageC = (targetSection?.contractor || '').toLowerCase();
+          matchContractor = stageC.includes(q);
+        }
+      }
+
+      return matchSearch && matchTower && matchFloor && matchContractor;
     })
     .sort((a, b) => {
       let comparison = 0;
@@ -581,46 +601,77 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
         </div>
 
         {/* Search & Filtration Bar */}
-        <div className="px-4 py-4 sm:px-6 sm:py-4 border-b border-zinc-200 bg-zinc-50/20 flex flex-col lg:flex-row items-center gap-3">
-          <div className="w-full lg:flex-1 relative">
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search by Flat ID, Flat No, Door Spec..."
-              className="w-full text-xs font-semibold pl-10 pr-4 py-2.5 bg-white border border-zinc-250 hover:border-zinc-350 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition shadow-2xs text-zinc-800"
-            />
+        <div className="px-4 py-4 sm:px-6 sm:py-4 border-b border-zinc-200 bg-zinc-50/20 space-y-3">
+          <div className="flex flex-col lg:flex-row items-center gap-3">
+            <div className="w-full lg:flex-1 relative">
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Search by Flat ID, Flat No, Door Spec..."
+                className="w-full text-xs font-semibold pl-10 pr-4 py-2.5 bg-white border border-zinc-250 hover:border-zinc-350 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition shadow-2xs text-zinc-800"
+              />
+            </div>
+
+            <div className="w-full lg:w-auto flex flex-row items-center gap-2 self-stretch lg:self-auto">
+              <div className="flex items-center gap-1 shrink-0 text-[11px] font-bold text-zinc-400 uppercase tracking-wider font-mono mr-1">
+                <Filter className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Filters</span>
+              </div>
+              
+              {/* Tower Filter */}
+              <select
+                value={selectedTower}
+                onChange={e => setSelectedTower(e.target.value)}
+                className="flex-1 lg:flex-none py-2 px-2.5 text-xs font-bold bg-white border border-zinc-200 rounded-xl text-zinc-700 cursor-pointer shadow-2xs focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="All">All Towers</option>
+                {uniqueTowers.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+
+              {/* Floor Filter */}
+              <select
+                value={selectedFloor}
+                onChange={e => setSelectedFloor(e.target.value)}
+                className="flex-1 lg:flex-none py-2 px-2.5 text-xs font-bold bg-white border border-zinc-200 rounded-xl text-zinc-700 cursor-pointer shadow-2xs focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="All">All Floors</option>
+                {uniqueFloors.map(f => (
+                  <option key={f} value={f.toString()}>Floor {f}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="w-full lg:w-auto flex flex-row items-center gap-2 self-stretch lg:self-auto">
-            <div className="flex items-center gap-1 shrink-0 text-[11px] font-bold text-zinc-400 uppercase tracking-wider font-mono mr-1">
-              <Filter className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Filters</span>
+          {/* Detailed Stage Contractor Filters */}
+          <div className="pt-2 border-t border-zinc-200/60 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="relative bg-white rounded-xl border border-zinc-200 flex items-center">
+              <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Search Stage Contractor Name e.g. Fine Wood Ltd..."
+                value={contractorSearch}
+                onChange={(e) => setContractorSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-transparent text-xs focus:outline-none font-medium text-zinc-750 placeholder-zinc-400"
+              />
             </div>
-            
-            {/* Tower Filter */}
-            <select
-              value={selectedTower}
-              onChange={e => setSelectedTower(e.target.value)}
-              className="flex-1 lg:flex-none py-2 px-2.5 text-xs font-bold bg-white border border-zinc-200 rounded-xl text-zinc-700 cursor-pointer shadow-2xs focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="All">All Towers</option>
-              {uniqueTowers.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
 
-            {/* Floor Filter */}
-            <select
-              value={selectedFloor}
-              onChange={e => setSelectedFloor(e.target.value)}
-              className="flex-1 lg:flex-none py-2 px-2.5 text-xs font-bold bg-white border border-zinc-200 rounded-xl text-zinc-700 cursor-pointer shadow-2xs focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="All">All Floors</option>
-              {uniqueFloors.map(f => (
-                <option key={f} value={f.toString()}>Floor {f}</option>
-              ))}
-            </select>
+            <div className="relative flex items-center bg-white rounded-xl border border-zinc-200">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Stage:</span>
+              <select
+                value={contractorStage}
+                onChange={(e) => setContractorStage(e.target.value as any)}
+                className="w-full pl-16 pr-3 py-2 bg-transparent text-xs focus:outline-none font-bold text-zinc-700 font-sans"
+              >
+                <option value="any">ANY STAGE CONTRACTOR</option>
+                <option value="frameFixing">FRAME INSTALLATION CONTRACTOR</option>
+                <option value="doorFixing">SHUTTER INSTALLATION CONTRACTOR</option>
+                <option value="hardwareFixing">HARDWARE FITTING CONTRACTOR</option>
+                <option value="handover">HARDWARE CLEANING / HANDOVER CONTRACTOR</option>
+              </select>
+            </div>
           </div>
         </div>
 

@@ -33,6 +33,10 @@ export default function FlatListTable({
   const [sortField, setSortField] = useState<SortField>('flatNo');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
+  // Contractor stage-wise state filters
+  const [contractorSearch, setContractorSearch] = useState('');
+  const [contractorStage, setContractorStage] = useState<'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover'>('any');
+
   // Multi-level filtering!
   const filteredFlats = flats.filter(flat => {
     // Search query matches
@@ -61,7 +65,24 @@ export default function FlatListTable({
       matchesStatus = overallPct === 0;
     }
 
-    return matchesSearch && matchesGridTower && matchesGridFloor && matchesTowerSelect && matchesFloorSelect && matchesStatus;
+    // Contractor stage-wise filter matches
+    let matchesContractor = true;
+    if (contractorSearch.trim()) {
+      const q = contractorSearch.toLowerCase();
+      if (contractorStage === 'any') {
+        const c1 = (flat.frameFixing?.contractor || '').toLowerCase();
+        const c2 = (flat.doorFixing?.contractor || '').toLowerCase();
+        const c3 = (flat.hardwareFixing?.contractor || '').toLowerCase();
+        const c4 = (flat.handover?.contractor || '').toLowerCase();
+        matchesContractor = c1.includes(q) || c2.includes(q) || c3.includes(q) || c4.includes(q);
+      } else {
+        const targetSection = flat[contractorStage];
+        const stageC = (targetSection?.contractor || '').toLowerCase();
+        matchesContractor = stageC.includes(q);
+      }
+    }
+
+    return matchesSearch && matchesGridTower && matchesGridFloor && matchesTowerSelect && matchesFloorSelect && matchesStatus && matchesContractor;
   });
 
   // Sorting
@@ -137,59 +158,89 @@ export default function FlatListTable({
       </div>
 
       {/* Inputs Filtering Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 bg-zinc-50 p-3 sm:p-4 rounded-xl border border-zinc-100">
-        
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3.5 top-2.5 w-4.5 h-4.5 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search flat no, OA, door..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-medium"
-          />
+      <div className="space-y-3 bg-zinc-50 p-3 sm:p-4 rounded-xl border border-zinc-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-2.5 w-4.5 h-4.5 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search flat no, OA, door..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-medium"
+            />
+          </div>
+
+          {/* Tower Selector */}
+          <div className="relative flex items-center">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Tower:</span>
+            <select
+              value={towerFilter}
+              onChange={(e) => setTowerFilter(e.target.value)}
+              className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
+            >
+              <option value="all">ALL TOWERS</option>
+              {TOWERS_LIST.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+
+          {/* Floor selector */}
+          <div className="relative flex items-center">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Floor:</span>
+            <select
+              value={floorFilter}
+              onChange={(e) => setFloorFilter(e.target.value)}
+              className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
+            >
+              <option value="all">ALL FLOORS</option>
+              {availableFloors.map(fl => <option key={fl} value={fl}>Level {fl}</option>)}
+            </select>
+          </div>
+
+          {/* Status filter */}
+          <div className="relative flex items-center">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
+            >
+              <option value="all">ALL PROGRESS</option>
+              <option value="completed">COMPLETE (100%)</option>
+              <option value="wip">IN PROGRESS (1-99%)</option>
+              <option value="notstarted">NOT STARTED (0%)</option>
+            </select>
+          </div>
         </div>
 
-        {/* Tower Selector */}
-        <div className="relative flex items-center">
-          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Tower:</span>
-          <select
-            value={towerFilter}
-            onChange={(e) => setTowerFilter(e.target.value)}
-            className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
-          >
-            <option value="all">ALL TOWERS</option>
-            {TOWERS_LIST.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
+        {/* Contractor Specific Filters */}
+        <div className="pt-2.5 border-t border-zinc-200/60 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="relative bg-white rounded-xl border border-zinc-200 flex items-center">
+            <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Filter by Stage Contractor Name..."
+              value={contractorSearch}
+              onChange={(e) => setContractorSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-transparent text-xs focus:outline-none font-medium text-zinc-750 placeholder-zinc-400"
+            />
+          </div>
 
-        {/* Floor selector */}
-        <div className="relative flex items-center">
-          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Floor:</span>
-          <select
-            value={floorFilter}
-            onChange={(e) => setFloorFilter(e.target.value)}
-            className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
-          >
-            <option value="all">ALL FLOORS</option>
-            {availableFloors.map(fl => <option key={fl} value={fl}>Level {fl}</option>)}
-          </select>
-        </div>
-
-        {/* Status filter */}
-        <div className="relative flex items-center">
-          <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Status:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
-          >
-            <option value="all">ALL PROGRESS</option>
-            <option value="completed">COMPLETE (100%)</option>
-            <option value="wip">IN PROGRESS (1-99%)</option>
-            <option value="notstarted">NOT STARTED (0%)</option>
-          </select>
+          <div className="relative flex items-center bg-white rounded-xl border border-zinc-200">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-400 absolute left-3 select-none">Stage:</span>
+            <select
+              value={contractorStage}
+              onChange={(e) => setContractorStage(e.target.value as any)}
+              className="w-full pl-16 pr-3 py-2 bg-transparent text-xs focus:outline-none font-bold text-zinc-700 font-sans"
+            >
+              <option value="any">ANY STAGE CONTRACTOR</option>
+              <option value="frameFixing">FRAME INSTALLATION CONTRACTOR</option>
+              <option value="doorFixing">SHUTTER INSTALLATION CONTRACTOR</option>
+              <option value="hardwareFixing">HARDWARE FITTING CONTRACTOR</option>
+              <option value="handover">HANDOVER CONTRACTOR</option>
+            </select>
+          </div>
         </div>
 
       </div>
@@ -291,29 +342,57 @@ export default function FlatListTable({
 
                     {/* Frame Fixing Milestone status */}
                     <td className="p-4 text-center">
-                      <div className={`inline-block px-2.5 py-1 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(ffPct)}`}>
-                        {ffPct}%
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`inline-block px-2.5 py-0.5 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(ffPct)}`}>
+                          {ffPct}%
+                        </div>
+                        {flat.frameFixing?.contractor && (
+                          <span className="text-[9px] text-zinc-400 font-extrabold max-w-[80px] truncate" title={flat.frameFixing.contractor}>
+                            {flat.frameFixing.contractor}
+                          </span>
+                        )}
                       </div>
                     </td>
 
                     {/* Door Fixing Milestone status */}
                     <td className="p-4 text-center">
-                      <div className={`inline-block px-2.5 py-1 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(dfPct)}`}>
-                        {dfPct}%
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`inline-block px-2.5 py-0.5 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(dfPct)}`}>
+                          {dfPct}%
+                        </div>
+                        {flat.doorFixing?.contractor && (
+                          <span className="text-[9px] text-zinc-400 font-extrabold max-w-[80px] truncate" title={flat.doorFixing.contractor}>
+                            {flat.doorFixing.contractor}
+                          </span>
+                        )}
                       </div>
                     </td>
 
                     {/* Hardware Fixing Milestone status */}
                     <td className="p-4 text-center">
-                      <div className={`inline-block px-2.5 py-1 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(hwPct)}`}>
-                        {hwPct}%
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`inline-block px-2.5 py-0.5 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(hwPct)}`}>
+                          {hwPct}%
+                        </div>
+                        {flat.hardwareFixing?.contractor && (
+                          <span className="text-[9px] text-zinc-400 font-extrabold max-w-[80px] truncate" title={flat.hardwareFixing.contractor}>
+                            {flat.hardwareFixing.contractor}
+                          </span>
+                        )}
                       </div>
                     </td>
 
                     {/* Handover Milestone status */}
                     <td className="p-4 text-center">
-                      <div className={`inline-block px-2.5 py-1 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(hoPct)}`}>
-                        {hoPct}%
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`inline-block px-2.5 py-0.5 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(hoPct)}`}>
+                          {hoPct}%
+                        </div>
+                        {flat.handover?.contractor && (
+                          <span className="text-[9px] text-zinc-400 font-extrabold max-w-[80px] truncate" title={flat.handover.contractor}>
+                            {flat.handover.contractor}
+                          </span>
+                        )}
                       </div>
                     </td>
 

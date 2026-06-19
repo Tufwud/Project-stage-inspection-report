@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FlatRecord, MilestoneKey } from './types';
+import { FlatRecord, MilestoneKey, SavedProject } from './types';
 import { DEFAULT_FLATS, DOOR_MAP } from './data/mockData';
 import { getProjectAnalysis } from './utils';
 
@@ -24,6 +24,19 @@ export default function App() {
   const [selectedMilestone, setSelectedMilestone] = useState<MilestoneKey | null>(null);
   const [activeTab, setActiveTab] = useState<'matrix' | 'background' | 'sheets' | 'reports'>('matrix');
   
+  // Historical Registry of Projects/Sales Orders
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+
+  // Master Cost Structure for Opening Codes (A, B, C, D, etc. - Editable & Overwriteable)
+  const [doorPrices, setDoorPrices] = useState<{ [code: string]: number }>({
+    A: 12000,
+    B: 8500,
+    C: 7000,
+    D: 5500,
+    E: 5500,
+    F: 6000
+  });
+
   // Grid filters
   const [selectedTower, setSelectedTower] = useState<string | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
@@ -32,15 +45,21 @@ export default function App() {
   const [editingFlat, setEditingFlat] = useState<FlatRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Automatic Background Generator for Supervisors
-  const handleGenerateFlats = (config: {
+  // One-Time Project & Tower Configuration Generator based on user inputs
+  const handleGenerateProject = (config: {
     salesOrderNo: string;
-    towerId: string;
+    soDetails?: string;
+    numTowers: number;
     totalFloors: number;
     flatsPerFloor: number;
     doorTypesToGenerate: string[];
-    defaultPrice?: number;
+    doorPrices: { [code: string]: number };
   }) => {
+    // Sync current project to history first before overriding
+    if (flats.length > 0) {
+      syncCurrentToHistory(flats);
+    }
+
     const generated: FlatRecord[] = [];
     
     const getOrdinalSuffix = (num: number) => {
@@ -50,43 +69,49 @@ export default function App() {
       return 'th';
     };
 
-    const initialPrice = config.defaultPrice !== undefined ? config.defaultPrice : 5000;
-
-    for (let floor = 1; floor <= config.totalFloors; floor++) {
-      const floorName = floor + getOrdinalSuffix(floor) + ' Floor';
+    // Calculate total openings: Multiplying Towers * Floors * Flats/Floor * Doors/Flat
+    for (let t = 1; t <= config.numTowers; t++) {
+      const towerId = `Tower ${String(t).padStart(2, '0')}`;
       
-      for (let flatIdx = 1; flatIdx <= config.flatsPerFloor; flatIdx++) {
-        const flatNumber = floor * 100 + flatIdx;
-        const flatNo = `${flatNumber}`;
+      for (let floor = 1; floor <= config.totalFloors; floor++) {
+        const floorName = floor + getOrdinalSuffix(floor) + ' Floor';
+        
+        for (let flatIdx = 1; flatIdx <= config.flatsPerFloor; flatIdx++) {
+          const flatNumber = floor * 100 + flatIdx;
+          const flatNo = `${flatNumber}`;
 
-        config.doorTypesToGenerate.forEach(doorCodeOrName => {
-          // CONVERT CODE TO NAME (Lookup in DOOR_MAP)
-          const realName = DOOR_MAP[doorCodeOrName] || doorCodeOrName;
+          config.doorTypesToGenerate.forEach(doorCodeOrName => {
+            // CONVERT CODE TO NAME (Lookup in DOOR_MAP)
+            const realName = DOOR_MAP[doorCodeOrName] || doorCodeOrName;
 
-          // Unique ID Format: OA/Tower/Floor/Flat/DoorName (exactly matching user's AppScript)
-          const uniqueID = `${config.salesOrderNo}/${config.towerId}/${floorName}/${flatNumber}/${realName}`;
+            // Retrieve the spec cost mapped to this opening code
+            const price = config.doorPrices[doorCodeOrName] ?? 5000;
 
-          generated.push({
-            id: uniqueID,
-            oaNo: config.salesOrderNo,
-            towerId: config.towerId,
-            flatsPerFloor: config.flatsPerFloor,
-            floor: floor,
-            flatNo: flatNo,
-            doorName: realName,
-            price: initialPrice,
-            frameFixing: { fastenerFixing: 'not_started', frameLockAreaFinish: 'not_started', outsideArchitraveFixing: 'not_started', insideArchitraveFixing: 'not_started', doneBy: "", timestamp: "" },
-            doorFixing: { shutterEdgeFinishing: 'not_started', gapBetweenFrameAndShutter: 'not_started', iSealFixing: 'not_started', visionGlassBeatFinishing: 'not_started', doneBy: "", timestamp: "" },
-            hardwareFixing: { hingeFitting: 'not_started', lockWithHandleFitting: 'not_started', eyeviewInstallation: 'not_started', towerBoltInstallation: 'not_started', doorCloserInstallation: 'not_started', autoDropSealInstallation: 'not_started', doneBy: "", timestamp: "" },
-            handover: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "" }
+            // Unique ID Format: OA/Tower/Floor/Flat/DoorName (exactly matching user's AppScript)
+            const uniqueID = `${config.salesOrderNo}/${towerId}/${floorName}/${flatNumber}/${realName}`;
+
+            generated.push({
+              id: uniqueID,
+              oaNo: config.salesOrderNo,
+              soDetails: config.soDetails || '',
+              towerId: towerId,
+              flatsPerFloor: config.flatsPerFloor,
+              floor: floor,
+              flatNo: flatNo,
+              doorName: realName,
+              price: price,
+              frameFixing: { fastenerFixing: 'not_started', frameLockAreaFinish: 'not_started', outsideArchitraveFixing: 'not_started', insideArchitraveFixing: 'not_started', doneBy: "", timestamp: "", contractor: "" },
+              doorFixing: { shutterEdgeFinishing: 'not_started', gapBetweenFrameAndShutter: 'not_started', iSealFixing: 'not_started', visionGlassBeatFinishing: 'not_started', doneBy: "", timestamp: "", contractor: "" },
+              hardwareFixing: { hingeFitting: 'not_started', lockWithHandleFitting: 'not_started', eyeviewInstallation: 'not_started', towerBoltInstallation: 'not_started', doorCloserInstallation: 'not_started', autoDropSealInstallation: 'not_started', doneBy: "", timestamp: "", contractor: "" },
+              handover: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "", contractor: "", doneBy: "" }
+            });
           });
-        });
+        }
       }
     }
 
-    // Replace entire tower setup if already exists or merge
-    const untouched = flats.filter(f => f.towerId.toLowerCase() !== config.towerId.toLowerCase());
-    saveFlats([...generated, ...untouched]);
+    // Save newly generated flats
+    saveFlats(generated, config.doorPrices, config.salesOrderNo);
   };
 
   const handleClearTower = (towerId: string) => {
@@ -94,29 +119,191 @@ export default function App() {
     saveFlats(untouched);
   };
 
+  const handleUpdateDoorPrices = (newPrices: { [code: string]: number }) => {
+    setDoorPrices(newPrices);
+    try {
+      localStorage.setItem("door_quality_compliance_dashboard_door_prices", JSON.stringify(newPrices));
+    } catch (e) {
+      // safe fallback
+    }
+    // Also sync to active project in history if details are present
+    if (flats.length > 0) {
+      syncCurrentToHistory(flats, newPrices);
+    }
+  };
+
+  // Synchronize dynamic flats to history
+  const syncCurrentToHistory = (currentFlats: FlatRecord[], currentPrices?: { [code: string]: number }, activeSOOveride?: string) => {
+    if (currentFlats.length === 0) return;
+    const activeSO = activeSOOveride || currentFlats[0]?.oaNo || "Unknown SO";
+    const prices = currentPrices || doorPrices;
+
+    setSavedProjects(prev => {
+      const existingIdx = prev.findIndex(p => p.salesOrderNo === activeSO);
+      
+      const numTowers = new Set(currentFlats.map(f => f.towerId)).size;
+      const totalFloors = Math.max(...currentFlats.map(f => f.floor), 0);
+      const flatsPerFloor = currentFlats[0]?.flatsPerFloor || 4;
+      const doorTypes = Array.from(new Set(currentFlats.map(f => f.doorName)));
+
+      const updatedRecord: SavedProject = {
+        salesOrderNo: activeSO,
+        soDetails: currentFlats[0]?.soDetails || '',
+        flats: currentFlats,
+        timestamp: new Date().toISOString(),
+        numTowers,
+        totalFloors,
+        flatsPerFloor,
+        doorTypesToGenerate: doorTypes,
+        doorPrices: prices
+      };
+
+      let updated: SavedProject[] = [];
+      if (existingIdx > -1) {
+        updated = [...prev];
+        updated[existingIdx] = updatedRecord;
+      } else {
+        updated = [updatedRecord, ...prev];
+      }
+
+      localStorage.setItem("door_quality_compliance_dashboard_history", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Switch/Load historical project to active screen
+  const handleLoadProjectFromHistory = (soNo: string) => {
+    // Sync current active project back into history first
+    if (flats.length > 0) {
+      syncCurrentToHistory(flats);
+    }
+
+    const target = savedProjects.find(p => p.salesOrderNo === soNo);
+    if (target) {
+      setFlats(target.flats);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(target.flats));
+      } catch (e) {}
+
+      if (target.doorPrices) {
+        setDoorPrices(target.doorPrices);
+        try {
+          localStorage.setItem("door_quality_compliance_dashboard_door_prices", JSON.stringify(target.doorPrices));
+        } catch (e) {}
+      }
+
+      // Clear layout filters
+      setSelectedTower(null);
+      setSelectedFloor(null);
+    }
+  };
+
+  // Delete historical project from list
+  const handleDeleteProjectFromHistory = (soNo: string) => {
+    const updated = savedProjects.filter(p => p.salesOrderNo !== soNo);
+    setSavedProjects(updated);
+    try {
+      localStorage.setItem("door_quality_compliance_dashboard_history", JSON.stringify(updated));
+    } catch (e) {}
+
+    // If deleting the active project, load the next available or clear active
+    if (flats.length > 0 && flats[0]?.oaNo === soNo) {
+      if (updated.length > 0) {
+        const nextProj = updated[0];
+        setFlats(nextProj.flats);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextProj.flats));
+        } catch (e) {}
+        if (nextProj.doorPrices) {
+          setDoorPrices(nextProj.doorPrices);
+          try {
+            localStorage.setItem("door_quality_compliance_dashboard_door_prices", JSON.stringify(nextProj.doorPrices));
+          } catch (e) {}
+        }
+      } else {
+        setFlats([]);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([]));
+        } catch (e) {}
+      }
+      setSelectedTower(null);
+      setSelectedFloor(null);
+    }
+  };
+
   // Load from local storage on mount
   useEffect(() => {
+    let initialFlats: FlatRecord[] = [];
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
-        setFlats(JSON.parse(saved));
+        initialFlats = JSON.parse(saved);
+        setFlats(initialFlats);
       } else {
+        initialFlats = DEFAULT_FLATS;
         setFlats(DEFAULT_FLATS);
       }
     } catch (e) {
+      initialFlats = DEFAULT_FLATS;
       setFlats(DEFAULT_FLATS);
+    }
+
+    try {
+      const savedPrices = localStorage.getItem("door_quality_compliance_dashboard_door_prices");
+      if (savedPrices) {
+        setDoorPrices(JSON.parse(savedPrices));
+      }
+    } catch (e) {
+      // safe fallback
+    }
+
+    // Load or initialize Saved Projects history registry
+    try {
+      const savedHistory = localStorage.getItem("door_quality_compliance_dashboard_history");
+      if (savedHistory) {
+        setSavedProjects(JSON.parse(savedHistory));
+      } else {
+        // Preinstall current loaded flats into the history registry
+        const activeSO = initialFlats[0]?.oaNo || "OA-2026-9041";
+        const dummyHistoryRecord: SavedProject = {
+          salesOrderNo: activeSO,
+          flats: initialFlats,
+          timestamp: new Date().toISOString(),
+          numTowers: 1,
+          totalFloors: 3,
+          flatsPerFloor: 4,
+          doorTypesToGenerate: Array.from(new Set(initialFlats.map(f => f.doorName))),
+          doorPrices: {
+            A: 12000,
+            B: 8500,
+            C: 7000,
+            D: 5500,
+            E: 5500,
+            F: 6000
+          }
+        };
+        const initialHistoryList = [dummyHistoryRecord];
+        setSavedProjects(initialHistoryList);
+        localStorage.setItem("door_quality_compliance_dashboard_history", JSON.stringify(initialHistoryList));
+      }
+    } catch (e) {
+      // safe fallback
     }
   }, []);
 
   // Save to local storage on changes
-  const saveFlats = (newList: FlatRecord[]) => {
+  const saveFlats = (newList: FlatRecord[], customPrices?: { [code: string]: number }, activeSOOveride?: string) => {
     setFlats(newList);
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newList));
+      if (newList.length > 0) {
+        syncCurrentToHistory(newList, customPrices, activeSOOveride);
+      }
     } catch (e) {
       // safe fallback
     }
   };
+
 
   // Stats calculation
   const projectAnalysis = getProjectAnalysis(flats);
@@ -254,49 +441,50 @@ export default function App() {
         <div className="grid grid-cols-2 sm:flex sm:flex-row items-center gap-1 border border-zinc-200/60 bg-white p-1 rounded-xl shadow-xs">
           <button
             onClick={() => setActiveTab('matrix')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-2.5 sm:px-5 lg:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
               activeTab === 'matrix'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <LayoutDashboard className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Compliance Grid</span>
           </button>
           
           <button
             onClick={() => setActiveTab('background')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-2.5 sm:px-5 lg:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
               activeTab === 'background'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-            <span className="truncate">Specs & Rates</span>
+            <Settings className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate hidden xs:inline">Project Setup & Specs</span>
+            <span className="truncate xs:hidden">Setup & Specs</span>
           </button>
 
           <button
             onClick={() => setActiveTab('sheets')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-2.5 sm:px-5 lg:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
               activeTab === 'sheets'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Sheets Sync</span>
           </button>
 
           <button
             onClick={() => setActiveTab('reports')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-2.5 sm:px-5 lg:px-6 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
               activeTab === 'reports'
                 ? "bg-indigo-600 text-white shadow-sm"
                 : "text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50"
             }`}
           >
-            <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <Coins className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Reports</span>
           </button>
         </div>
@@ -348,9 +536,14 @@ export default function App() {
           <div className="pt-2 animate-fadeIn">
             <BackgroundValuesTab 
               flats={flats}
-              onGenerateFlats={handleGenerateFlats}
+              onGenerateProject={handleGenerateProject}
+              doorPrices={doorPrices}
+              onUpdateDoorPrices={handleUpdateDoorPrices}
               onClearTower={handleClearTower}
               onWipeAll={handleWipeAll}
+              savedProjects={savedProjects}
+              onLoadProject={handleLoadProjectFromHistory}
+              onDeleteProject={handleDeleteProjectFromHistory}
             />
           </div>
         ) : activeTab === 'sheets' ? (
