@@ -9,7 +9,8 @@ import {
   findExistingSpreadsheets,
   prepareRawQualityLogsData,
   prepareConsolidatedReportsData,
-  prepareStageCostingReportData
+  prepareStageCostingReportData,
+  ensureSOTabsExist
 } from '../lib/googleSheets';
 import { User } from 'firebase/auth';
 import { 
@@ -43,11 +44,9 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
   const [showConfirmSync, setShowConfirmSync] = useState(false);
   
   // Spreadsheet management
-  const [spreadsheetId, setSpreadsheetId] = useState<string>('');
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>('');
-  const [spreadsheetTitle, setSpreadsheetTitle] = useState(() => {
-    return `Door Quality Compliance Tracker - ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`;
-  });
+  const [spreadsheetId, setSpreadsheetId] = useState<string>('1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o');
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>('https://docs.google.com/spreadsheets/d/1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o/edit');
+  const [spreadsheetTitle, setSpreadsheetTitle] = useState('SDTower Project tracking_ver1');
   
   const [driveSheets, setDriveSheets] = useState<Array<{ id: string; name: string }>>([]);
   const [isSearchingDrive, setIsSearchingDrive] = useState(false);
@@ -183,9 +182,25 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
       setStatusStep('Writing Project Stage-wise Cost Breakdown aggregates...');
       await updateSheetValues(token, activeId, 'Stage-wise Cost Breakdown!A1', costingValues);
 
+      // 6. Ensure separate tabs for each unique Sales Order / OA No and stream raw logs specific to them
+      setStatusStep('Identifying unique Sales Orders...');
+      const uniqueSOs = Array.from(new Set(flats.map(flat => flat.oaNo).filter(oa => oa && oa.trim() !== '')));
+
+      if (uniqueSOs.length > 0) {
+        setStatusStep('Ensuring dedicated tabs exist in the sheet for each Sales Order...');
+        await ensureSOTabsExist(token, activeId, uniqueSOs);
+
+        for (const so of uniqueSOs) {
+          setStatusStep(`Streaming quality logs for Sales Order "${so}"...`);
+          const soFlats = flats.filter(flat => flat.oaNo === so);
+          const soRawValues = prepareRawQualityLogsData(soFlats);
+          await updateSheetValues(token, activeId, `${so}!A1`, soRawValues);
+        }
+      }
+
       // Finish successfully
       setStatusStep('Completed in-sync!');
-      setSuccessBanner(`Successfully synchronized ${flats.length} records. All tabs - "Raw Quality Logs", "Consolidated Reports", and "Stage-wise Cost Breakdown" - are fully updated and synchronized!`);
+      setSuccessBanner(`Successfully synchronized ${flats.length} records. All tabs - "Raw Quality Logs", "Consolidated Reports", "Stage-wise Cost Breakdown", and individual Sales Order tabs (${uniqueSOs.join(', ')}) - are fully updated and synchronized!`);
       fetchDriveFiles(token); // refresh file list
     } catch (err: any) {
       console.error('Error synchronizing spreadsheet:', err);
@@ -400,7 +415,37 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
                     Select where the quality checklist updates will stream to:
                   </p>
                   
-                  <div className="space-y-2">
+                   <div className="space-y-2">
+                    {/* OPTION 0: Default SDTower Project Workbook */}
+                    <label className={`w-full block p-3 rounded-xl border-2 hover:bg-zinc-50 relative cursor-pointer font-sans transition ${
+                      spreadsheetId === '1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o'
+                        ? 'border-emerald-600 bg-emerald-50/20' 
+                        : 'border-zinc-200 bg-white'
+                    }`}>
+                      <input 
+                        type="radio" 
+                        name="sheetDestination" 
+                        checked={spreadsheetId === '1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o'}
+                        onChange={() => {
+                          setSpreadsheetId('1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o');
+                          setSpreadsheetUrl('https://docs.google.com/spreadsheets/d/1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o/edit');
+                          setSpreadsheetTitle('SDTower Project tracking_ver1');
+                        }}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-2.5">
+                        <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                          spreadsheetId === '1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o' ? 'border-emerald-600 text-emerald-600 font-black text-xs' : 'border-zinc-300'
+                        }`}>
+                          {spreadsheetId === '1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o' && "✓"}
+                        </span>
+                        <div>
+                          <span className="block text-xs font-extrabold text-zinc-850">SDTower Project tracking_ver1 (Default)</span>
+                          <span className="block text-[10px] text-zinc-400 font-medium">Stream to verified Google Workbook ID: 1JdJc...</span>
+                        </div>
+                      </div>
+                    </label>
+
                     {/* OPTION 1: Create New Sheet */}
                     <label className={`w-full block p-3 rounded-xl border-2 hover:bg-zinc-50 relative cursor-pointer font-sans transition ${
                       !spreadsheetId 
@@ -414,6 +459,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
                         onChange={() => {
                           setSpreadsheetId('');
                           setSpreadsheetUrl('');
+                          setSpreadsheetTitle(`SDTower Project tracking_ver1 - ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`);
                         }}
                         className="sr-only"
                       />
@@ -424,8 +470,8 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
                           {!spreadsheetId && "✓"}
                         </span>
                         <div>
-                          <span className="block text-xs font-extrabold text-zinc-850">Create New Google Sheet</span>
-                          <span className="block text-[10px] text-zinc-400 font-medium">Automatic Raw and Consolidated tabs</span>
+                          <span className="block text-xs font-extrabold text-zinc-850">Create Custom New Google Sheet</span>
+                          <span className="block text-[10px] text-zinc-400 font-medium">Generate a separate tracker dynamically in Google Drive</span>
                         </div>
                       </div>
                     </label>

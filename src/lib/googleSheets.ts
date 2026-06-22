@@ -410,12 +410,14 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
 
 /**
  * Format flat records for Stage-wise Cost Breakdown tab (Report C)
+ * Organized by Sales Order / OA No with high detail.
  */
 export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
-  // Group by Tower
+  // Group by Sales Order / OA No
   const stats: { 
-    [towerId: string]: { 
-      towerName: string;
+    [oaNo: string]: { 
+      oaNo: string;
+      soDetails: string;
       totalDoors: number;
       totalBudget: number;
       totalEarned: number;
@@ -433,18 +435,20 @@ export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
   ];
 
   flats.forEach(flat => {
-    const towerId = flat.towerId;
+    const oaNo = flat.oaNo || 'Unassigned';
+    const soDetails = flat.soDetails || '';
     const basePrice = getFlatBasePrice(flat);
     const completedCost = getFlatTotalCompletedCost(flat);
 
-    if (!stats[towerId]) {
+    if (!stats[oaNo]) {
       const initialStages: { [stageId: string]: number } = {};
       stagesDef.forEach(s => {
         initialStages[s.id] = 0;
       });
 
-      stats[towerId] = {
-        towerName: towerId,
+      stats[oaNo] = {
+        oaNo: oaNo,
+        soDetails: soDetails,
         totalDoors: 0,
         totalBudget: 0,
         totalEarned: 0,
@@ -452,18 +456,19 @@ export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
       };
     }
 
-    stats[towerId].totalDoors += 1;
-    stats[towerId].totalBudget += basePrice;
-    stats[towerId].totalEarned += completedCost;
+    stats[oaNo].totalDoors += 1;
+    stats[oaNo].totalBudget += basePrice;
+    stats[oaNo].totalEarned += completedCost;
 
     stagesDef.forEach(stage => {
       const earned = getFinancialStageEarned(flat, stage.id);
-      stats[towerId].stageEarnedSums[stage.id] += earned;
+      stats[oaNo].stageEarnedSums[stage.id] += earned;
     });
   });
 
   const headers = [
-    'Project Tower Name',
+    'Sales Order / OA No',
+    'SO Details',
     'Total Setup Doors',
     'Accumulated Budget (INR)',
     ...stagesDef.map(s => `${s.label} Earned (INR)`),
@@ -478,7 +483,8 @@ export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
     const stageValues = stagesDef.map(s => t.stageEarnedSums[s.id]);
     
     return [
-      t.towerName,
+      t.oaNo,
+      t.soDetails,
       t.totalDoors,
       t.totalBudget,
       ...stageValues,
@@ -499,6 +505,7 @@ export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
 
     dataRows.push([
       'GRAND TOTAL',
+      'All Projects Consolidated',
       grandDoors,
       grandBudget,
       ...grandStages,
@@ -508,4 +515,65 @@ export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
   }
 
   return [headers, ...dataRows];
+};
+
+/**
+ * Ensures dedicated tabs exist in the Google Spreadsheet for each unique Sales Order
+ */
+export const ensureSOTabsExist = async (
+  accessToken: string,
+  spreadsheetId: string,
+  soNumbers: string[]
+): Promise<string[]> => {
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Failed to check spreadsheet sheet tabs structure: ${errText}`);
+    }
+
+    const data = await response.json();
+    const existingSheetTitles: string[] = (data.sheets || []).map((s: any) => s.properties.title);
+
+    const missingSOTabs = soNumbers.filter(so => !existingSheetTitles.includes(so) && so.trim() !== '');
+
+    if (missingSOTabs.length > 0) {
+      const requests = missingSOTabs.map(so => ({
+        addSheet: {
+          properties: {
+            title: so,
+            gridProperties: {
+              frozenRowCount: 2
+            }
+          }
+        }
+      }));
+
+      const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+      const updateResponse = await fetch(updateUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ requests })
+      });
+
+      if (!updateResponse.ok) {
+        const errText = await updateResponse.text();
+        console.error('Failed to create missing SO tabs batch:', errText);
+      }
+    }
+
+    return [...existingSheetTitles, ...missingSOTabs];
+  } catch (error) {
+    console.error('Error in ensureSOTabsExist:', error);
+    return [];
+  }
 };
