@@ -548,7 +548,7 @@ export default function App() {
           </div>
         ) : activeTab === 'sheets' ? (
           <div className="pt-2 animate-fadeIn">
-            <GoogleSheetsTab flats={flats} />
+            <GoogleSheetsTab flats={flats} savedProjects={savedProjects} />
           </div>
         ) : (
           <div className="pt-2 animate-fadeIn">

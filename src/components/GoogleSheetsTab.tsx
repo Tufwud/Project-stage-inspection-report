@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FlatRecord } from '../types';
+import { getSubtaskWeight } from '../utils';
 import { 
   initAuth, 
   googleSignIn, 
@@ -33,9 +34,10 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface GoogleSheetsTabProps {
   flats: FlatRecord[];
+  savedProjects?: any[];
 }
 
-export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
+export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTabProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(true);
@@ -56,6 +58,47 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+
+  // Reconstruct complete flattened list of flats from current active plus saved historical projects
+  const getCombinedFlats = (): FlatRecord[] => {
+    const flatsByOa: { [oaNo: string]: FlatRecord[] } = {};
+    
+    // 1. Load from savedProjects prop
+    if (savedProjects && savedProjects.length > 0) {
+      savedProjects.forEach(p => {
+        if (p.flats && p.flatNo !== '') { // sanity check
+          flatsByOa[p.salesOrderNo] = p.flats;
+        }
+      });
+    } else {
+      // 2. Load from localStorage
+      try {
+        const savedHistory = localStorage.getItem("door_quality_compliance_dashboard_history");
+        if (savedHistory) {
+          const history = JSON.parse(savedHistory);
+          if (Array.isArray(history)) {
+            history.forEach(p => {
+              if (p.salesOrderNo && p.flats) {
+                flatsByOa[p.salesOrderNo] = p.flats;
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // 3. Make sure active selected current flats are always present/merged (latest in-memory state override)
+    if (flats && flats.length > 0) {
+      flatsByOa[flats[0].oaNo] = flats;
+    }
+
+    const merged = Object.values(flatsByOa).flat();
+    return merged.length > 0 ? merged : flats;
+  };
+
+  const allFlatsToSync = getCombinedFlats();
 
   // Initialize Auth
   useEffect(() => {
@@ -85,7 +128,12 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
     setIsSearchingDrive(true);
     try {
       const files = await findExistingSpreadsheets(accessToken);
-      setDriveSheets(files);
+      // Filter out any files containing "Door Quality" or "Compliance Tracker" to keep search clean
+      const filtered = files.filter(f => {
+        const nameLower = f.name.toLowerCase();
+        return !nameLower.includes('door quality compliance') && !nameLower.includes('compliance tracker');
+      });
+      setDriveSheets(filtered);
     } catch (e) {
       console.error('Failed to look up Drive files:', e);
     } finally {
@@ -162,7 +210,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
 
       // 2. Prepare raw quality logs
       setStatusStep('Compiling records & formatting checkboxes (Raw Quality)...');
-      const rawValues = prepareRawQualityLogsData(flats);
+      const rawValues = prepareRawQualityLogsData(allFlatsToSync);
       
       // 3. Write Raw Quality Logs
       setStatusStep('Streaming Raw Quality Logs to Google Sheets API...');
@@ -170,21 +218,21 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
 
       // 4. Prepare and write Consolidated Report by orders
       setStatusStep('Analyzing sales order ratios & preparing consolidated report formulas...');
-      const summaryValues = prepareConsolidatedReportsData(flats);
+      const summaryValues = prepareConsolidatedReportsData(allFlatsToSync);
       
       setStatusStep('Writing Executive Order Compliance aggregates...');
       await updateSheetValues(token, activeId, 'Consolidated Reports!A1', summaryValues);
 
       // 5. Prepare and write Stage-wise Cost Breakdown
       setStatusStep('Calculating project stage budgets & compiling cost variance reports...');
-      const costingValues = prepareStageCostingReportData(flats);
+      const costingValues = prepareStageCostingReportData(allFlatsToSync);
 
       setStatusStep('Writing Project Stage-wise Cost Breakdown aggregates...');
       await updateSheetValues(token, activeId, 'Stage-wise Cost Breakdown!A1', costingValues);
 
       // 6. Ensure separate tabs for each unique Sales Order / OA No and stream raw logs specific to them
       setStatusStep('Identifying unique Sales Orders...');
-      const uniqueSOs = Array.from(new Set(flats.map(flat => flat.oaNo).filter(oa => oa && oa.trim() !== '')));
+      const uniqueSOs = Array.from(new Set(allFlatsToSync.map(flat => flat.oaNo).filter(oa => oa && oa.trim() !== '')));
 
       if (uniqueSOs.length > 0) {
         setStatusStep('Ensuring dedicated tabs exist in the sheet for each Sales Order...');
@@ -192,7 +240,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
 
         for (const so of uniqueSOs) {
           setStatusStep(`Streaming quality logs for Sales Order "${so}"...`);
-          const soFlats = flats.filter(flat => flat.oaNo === so);
+          const soFlats = allFlatsToSync.filter(flat => flat.oaNo === so);
           const soRawValues = prepareRawQualityLogsData(soFlats);
           await updateSheetValues(token, activeId, `${so}!A1`, soRawValues);
         }
@@ -200,7 +248,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
 
       // Finish successfully
       setStatusStep('Completed in-sync!');
-      setSuccessBanner(`Successfully synchronized ${flats.length} records. All tabs - "Raw Quality Logs", "Consolidated Reports", "Stage-wise Cost Breakdown", and individual Sales Order tabs (${uniqueSOs.join(', ')}) - are fully updated and synchronized!`);
+      setSuccessBanner(`Successfully synchronized ${allFlatsToSync.length} records. All tabs - "Raw Quality Logs", "Consolidated Reports", "Stage-wise Cost Breakdown", and individual Sales Order tabs (${uniqueSOs.join(', ')}) - are fully updated and synchronized!`);
       fetchDriveFiles(token); // refresh file list
     } catch (err: any) {
       console.error('Error synchronizing spreadsheet:', err);
@@ -227,7 +275,7 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
     ];
 
     const oaGroups: { [oaNo: string]: FlatRecord[] } = {};
-    flats.forEach(f => {
+    allFlatsToSync.forEach(f => {
       if (!oaGroups[f.oaNo]) oaGroups[f.oaNo] = [];
       oaGroups[f.oaNo].push(f);
     });
@@ -239,10 +287,10 @@ export default function GoogleSheetsTab({ flats }: GoogleSheetsTabProps) {
       
       let tf = 0, td = 0, th = 0, tho = 0;
       list.forEach(flat => {
-        tf += Number(flat.frameFixing.fastenerFixing) + Number(flat.frameFixing.frameLockAreaFinish) + Number(flat.frameFixing.outsideArchitraveFixing) + Number(flat.frameFixing.insideArchitraveFixing);
-        td += Number(flat.doorFixing.shutterEdgeFinishing) + Number(flat.doorFixing.gapBetweenFrameAndShutter) + Number(flat.doorFixing.iSealFixing) + Number(flat.doorFixing.visionGlassBeatFinishing);
-        th += Number(flat.hardwareFixing.hingeFitting) + Number(flat.hardwareFixing.lockWithHandleFitting) + Number(flat.hardwareFixing.eyeviewInstallation) + Number(flat.hardwareFixing.towerBoltInstallation) + Number(flat.hardwareFixing.doorCloserInstallation) + Number(flat.hardwareFixing.autoDropSealInstallation);
-        tho += Number(flat.handover.frameCarpatchFillingSanding) + Number(flat.handover.frameTouchUp) + Number(flat.handover.shutterEdgeFinishing) + Number(flat.handover.lockSlotAreaFinishing) + Number(flat.handover.shutterTouchUp) + Number(flat.handover.hardwareCleaning) + Number(flat.handover.plasticCoverRemoval) + Number(flat.handover.keysHandover);
+        tf += getSubtaskWeight(flat.frameFixing.fastenerFixing) + getSubtaskWeight(flat.frameFixing.frameLockAreaFinish) + getSubtaskWeight(flat.frameFixing.outsideArchitraveFixing) + getSubtaskWeight(flat.frameFixing.insideArchitraveFixing);
+        td += getSubtaskWeight(flat.doorFixing.shutterEdgeFinishing) + getSubtaskWeight(flat.doorFixing.gapBetweenFrameAndShutter) + getSubtaskWeight(flat.doorFixing.iSealFixing) + getSubtaskWeight(flat.doorFixing.visionGlassBeatFinishing);
+        th += getSubtaskWeight(flat.hardwareFixing.hingeFitting) + getSubtaskWeight(flat.hardwareFixing.lockWithHandleFitting) + getSubtaskWeight(flat.hardwareFixing.eyeviewInstallation) + getSubtaskWeight(flat.hardwareFixing.towerBoltInstallation) + getSubtaskWeight(flat.hardwareFixing.doorCloserInstallation) + getSubtaskWeight(flat.hardwareFixing.autoDropSealInstallation);
+        tho += getSubtaskWeight(flat.handover.frameCarpatchFillingSanding) + getSubtaskWeight(flat.handover.frameTouchUp) + getSubtaskWeight(flat.handover.shutterEdgeFinishing) + getSubtaskWeight(flat.handover.lockSlotAreaFinishing) + getSubtaskWeight(flat.handover.shutterTouchUp) + getSubtaskWeight(flat.handover.hardwareCleaning) + getSubtaskWeight(flat.handover.plasticCoverRemoval) + getSubtaskWeight(flat.handover.keysHandover);
       });
 
       const framePct = Math.round((tf / (count * 4)) * 100) || 0;

@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { FlatRecord, MILESTONES, QUALITATIVE_CHOICES, QualitativeState } from '../types';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { getFlatBasePrice, getFlatTotalCompletedCost, getFinancialStageEarned } from '../utils';
+import { getFlatBasePrice, getFlatTotalCompletedCost, getFinancialStageEarned, getSubtaskWeight } from '../utils';
 
 function renderCellState(val: any): string {
   if (val === undefined || val === null) return 'Not Started';
@@ -162,11 +162,11 @@ export const updateSheetValues = async (
 };
 
 /**
- * Searches user's Google Drive for existing spreadsheets created with "Door Compliance" in the name,
+ * Searches user's Google Drive for existing spreadsheets created with "SDTower" or "Project" in the name,
  * providing easy "Sync to existing" capability.
  */
 export const findExistingSpreadsheets = async (accessToken: string): Promise<Array<{ id: string; name: string; mimeType: string }>> => {
-  const query = encodeURIComponent("mimeType = 'application/vnd.google-apps.spreadsheet' and name contains 'Door' and trashed = false");
+  const query = encodeURIComponent("mimeType = 'application/vnd.google-apps.spreadsheet' and (name contains 'SDTower' or name contains 'Project') and trashed = false");
   const url = `https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime+desc&pageSize=10`;
 
   const response = await fetch(url, {
@@ -351,30 +351,30 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
 
     list.forEach(flat => {
       // frame
-      const frameFixed = flat.frameFixing.fastenerFixing && flat.frameFixing.frameLockAreaFinish && flat.frameFixing.outsideArchitraveFixing && flat.frameFixing.insideArchitraveFixing;
+      const frameCheckCount = getSubtaskWeight(flat.frameFixing.fastenerFixing) + getSubtaskWeight(flat.frameFixing.frameLockAreaFinish) + getSubtaskWeight(flat.frameFixing.outsideArchitraveFixing) + getSubtaskWeight(flat.frameFixing.insideArchitraveFixing);
+      const frameFixed = frameCheckCount >= 4;
       if (frameFixed) frameDoneCount++;
-      const frameCheckCount = Number(flat.frameFixing.fastenerFixing) + Number(flat.frameFixing.frameLockAreaFinish) + Number(flat.frameFixing.outsideArchitraveFixing) + Number(flat.frameFixing.insideArchitraveFixing);
       totalFrameChecks += frameCheckCount;
       totalPendingChecks += (4 - frameCheckCount);
 
       // door
-      const doorFixed = flat.doorFixing.shutterEdgeFinishing && flat.doorFixing.gapBetweenFrameAndShutter && flat.doorFixing.iSealFixing && flat.doorFixing.visionGlassBeatFinishing;
+      const doorCheckCount = getSubtaskWeight(flat.doorFixing.shutterEdgeFinishing) + getSubtaskWeight(flat.doorFixing.gapBetweenFrameAndShutter) + getSubtaskWeight(flat.doorFixing.iSealFixing) + getSubtaskWeight(flat.doorFixing.visionGlassBeatFinishing);
+      const doorFixed = doorCheckCount >= 4;
       if (doorFixed) doorDoneCount++;
-      const doorCheckCount = Number(flat.doorFixing.shutterEdgeFinishing) + Number(flat.doorFixing.gapBetweenFrameAndShutter) + Number(flat.doorFixing.iSealFixing) + Number(flat.doorFixing.visionGlassBeatFinishing);
       totalDoorChecks += doorCheckCount;
       totalPendingChecks += (4 - doorCheckCount);
 
       // hardware
-      const hardwareFixed = flat.hardwareFixing.hingeFitting && flat.hardwareFixing.lockWithHandleFitting && flat.hardwareFixing.eyeviewInstallation && flat.hardwareFixing.towerBoltInstallation && flat.hardwareFixing.doorCloserInstallation && flat.hardwareFixing.autoDropSealInstallation;
+      const hardwareCheckCount = getSubtaskWeight(flat.hardwareFixing.hingeFitting) + getSubtaskWeight(flat.hardwareFixing.lockWithHandleFitting) + getSubtaskWeight(flat.hardwareFixing.eyeviewInstallation) + getSubtaskWeight(flat.hardwareFixing.towerBoltInstallation) + getSubtaskWeight(flat.hardwareFixing.doorCloserInstallation) + getSubtaskWeight(flat.hardwareFixing.autoDropSealInstallation);
+      const hardwareFixed = hardwareCheckCount >= 6;
       if (hardwareFixed) hardwareDoneCount++;
-      const hardwareCheckCount = Number(flat.hardwareFixing.hingeFitting) + Number(flat.hardwareFixing.lockWithHandleFitting) + Number(flat.hardwareFixing.eyeviewInstallation) + Number(flat.hardwareFixing.towerBoltInstallation) + Number(flat.hardwareFixing.doorCloserInstallation) + Number(flat.hardwareFixing.autoDropSealInstallation);
       totalHardwareChecks += hardwareCheckCount;
       totalPendingChecks += (6 - hardwareCheckCount);
 
       // handover
-      const handoverFixed = flat.handover.frameCarpatchFillingSanding && flat.handover.frameTouchUp && flat.handover.shutterEdgeFinishing && flat.handover.lockSlotAreaFinishing && flat.handover.shutterTouchUp && flat.handover.hardwareCleaning && flat.handover.plasticCoverRemoval && flat.handover.keysHandover;
+      const handoverCheckCount = getSubtaskWeight(flat.handover.frameCarpatchFillingSanding) + getSubtaskWeight(flat.handover.frameTouchUp) + getSubtaskWeight(flat.handover.shutterEdgeFinishing) + getSubtaskWeight(flat.handover.lockSlotAreaFinishing) + getSubtaskWeight(flat.handover.shutterTouchUp) + getSubtaskWeight(flat.handover.hardwareCleaning) + getSubtaskWeight(flat.handover.plasticCoverRemoval) + getSubtaskWeight(flat.handover.keysHandover);
+      const handoverFixed = handoverCheckCount >= 8;
       if (handoverFixed) handoverDoneCount++;
-      const handoverCheckCount = Number(flat.handover.frameCarpatchFillingSanding) + Number(flat.handover.frameTouchUp) + Number(flat.handover.shutterEdgeFinishing) + Number(flat.handover.lockSlotAreaFinishing) + Number(flat.handover.shutterTouchUp) + Number(flat.handover.hardwareCleaning) + Number(flat.handover.plasticCoverRemoval) + Number(flat.handover.keysHandover);
       totalHandoverChecks += handoverCheckCount;
       totalPendingChecks += (8 - handoverCheckCount);
     });
