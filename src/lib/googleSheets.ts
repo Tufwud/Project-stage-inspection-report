@@ -162,11 +162,11 @@ export const updateSheetValues = async (
 };
 
 /**
- * Searches user's Google Drive for existing spreadsheets created with "SDTower" or "Project" in the name,
+ * Searches user's Google Drive for existing spreadsheets created with "SUTower", "SDTower" or "Project" in the name,
  * providing easy "Sync to existing" capability.
  */
 export const findExistingSpreadsheets = async (accessToken: string): Promise<Array<{ id: string; name: string; mimeType: string }>> => {
-  const query = encodeURIComponent("mimeType = 'application/vnd.google-apps.spreadsheet' and (name contains 'SDTower' or name contains 'Project') and trashed = false");
+  const query = encodeURIComponent("mimeType = 'application/vnd.google-apps.spreadsheet' and (name contains 'SUTower' or name contains 'SDTower' or name contains 'Project') and trashed = false");
   const url = `https://www.googleapis.com/drive/v3/files?q=${query}&orderBy=modifiedTime+desc&pageSize=10`;
 
   const response = await fetch(url, {
@@ -188,21 +188,61 @@ export const findExistingSpreadsheets = async (accessToken: string): Promise<Arr
  * Format flat records for Raw Quality Logs
  */
 export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
+  // Map to cache derived metadata per Sales Order (oaNo) to avoid re-calculation
+  const soMetadata: { [oaNo: string]: { numTowers: number; totalFloors: number; doorsPerFlat: string } } = {};
+  
+  // Try loading history from localStorage if available to get exact initial door codes
+  let historyProjects: any[] = [];
+  try {
+    const savedHistory = localStorage.getItem("door_quality_compliance_dashboard_history");
+    if (savedHistory) {
+      historyProjects = JSON.parse(savedHistory);
+    }
+  } catch (e) {}
+
+  flats.forEach(f => {
+    if (!f.oaNo) return;
+    if (!soMetadata[f.oaNo]) {
+      const savedProj = historyProjects.find((p: any) => p.salesOrderNo === f.oaNo);
+      
+      const flatsForSO = flats.filter(flat => flat.oaNo === f.oaNo);
+      const computedTowers = new Set(flatsForSO.map(flat => flat.towerId)).size || 1;
+      const computedFloors = Math.max(...flatsForSO.map(flat => flat.floor), 0) || 1;
+      
+      let computedDoors = '';
+      if (savedProj?.doorTypesToGenerate) {
+        computedDoors = savedProj.doorTypesToGenerate.join(', ');
+      } else {
+        computedDoors = Array.from(new Set(flatsForSO.map(flat => flat.doorName))).join(', ');
+      }
+
+      soMetadata[f.oaNo] = {
+        numTowers: f.numTowers || savedProj?.numTowers || computedTowers,
+        totalFloors: f.totalFloors || savedProj?.totalFloors || computedFloors,
+        doorsPerFlat: f.doorsPerFlat || computedDoors
+      };
+    }
+  });
+
   // Row 1: Header groupings
   const row1 = [
-    '', '', '', '', '', '', '', // Identifiers (A-G: ID, OA No, Tower, Flats/Floor, Floor, Flat No, Door Name)
-    'Frame Fixing Stage Checkpoints', '', '', '', '', '', // H-M (6 cols)
-    'Door Fixing Stage Checkpoints', '', '', '', '', '',  // N-S (6 cols)
-    'Hardware Fixing Stage Checkpoints', '', '', '', '', '', '', '', // T-AA (8 cols)
-    'Handover Stage Checkpoints', '', '', '', '', '', '', '', '', '' // AB-AK (10 cols)
+    '', '', '', '', '', '', '', '', '', '', '', // Identifiers (11 columns: ID, SO No, SO Details, Towers, Floors, Flats/Floor, Doors/Flat, Tower ID, Floor Location, Flat No, Door Spec)
+    'Frame Fixing Stage Checkpoints', '', '', '', '', '', // H-M -> Now shifted but maintains exact checkbox column spans (6 cols)
+    'Door Fixing Stage Checkpoints', '', '', '', '', '',  // 6 cols
+    'Hardware Fixing Stage Checkpoints', '', '', '', '', '', '', '', // 8 cols
+    'Handover Stage Checkpoints', '', '', '', '', '', '', '', '', '' // 10 cols
   ];
 
   // Row 2: Sub-checkpoint properties
   const row2 = [
     'ID / Unique Reference Code',
-    'Sales Order / OA No',
-    'Tower ID Name',
+    '6-Digit SO Identifier (Sales Order No)*',
+    'SO Details / Client Description',
+    'Number of Towers*',
+    'Total Floors per Tower',
     'Flats per Floor',
+    'Doors per Flat (Openings per Flat)',
+    'Tower ID Name',
     'Floor Location',
     'Flat No',
     'Door / Opening Specification',
@@ -247,11 +287,20 @@ export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
   ];
 
   const dataRows = flats.map(flat => {
+    const meta = soMetadata[flat.oaNo] || { numTowers: 1, totalFloors: 1, doorsPerFlat: '' };
+    const numTowersVal = flat.numTowers || meta.numTowers;
+    const totalFloorsVal = flat.totalFloors || meta.totalFloors;
+    const doorsPerFlatVal = flat.doorsPerFlat || meta.doorsPerFlat;
+
     return [
       flat.id,
       flat.oaNo,
-      flat.towerId,
+      flat.soDetails || '',
+      numTowersVal,
+      totalFloorsVal,
       flat.flatsPerFloor,
+      doorsPerFlatVal,
+      flat.towerId,
       flat.floor,
       flat.flatNo,
       flat.doorName,
@@ -314,19 +363,19 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
 
   // Header Row
   const headers = [
-    'Sales Order / OA No',
+    'Sales Order / OA',
     'SO Details',
     'Total Active Rooms',
-    'Frame Fixing Done (Rooms)',
+    'Frame Fixing Done',
     'Frame Fixing Progress %',
-    'Door Fixing Done (Rooms)',
+    'Door Fixing Done',
     'Door Fixing Progress %',
-    'Hardware Fixing Done (Rooms)',
+    'Hardware Fixing Done',
     'Hardware Fixing Progress %',
-    'Handover Completed (Rooms)',
+    'Handover Completed',
     'Handover Progress %',
     'Overall Weighted Score',
-    'Outstanding Checklist Tasks (Units)',
+    'Outstanding Checklist Tasks',
     'Status Indicator'
   ];
 
@@ -467,7 +516,7 @@ export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
   });
 
   const headers = [
-    'Sales Order / OA No',
+    'Sales Order / OA',
     'SO Details',
     'Total Setup Doors',
     'Accumulated Budget (INR)',

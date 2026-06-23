@@ -136,6 +136,9 @@ export interface FlatRecord {
   flatNo: string; // Flat No (e.g., 101, 102...)
   doorName: string; // Door Name (e.g., Main Door, Bedroom, Toilet)
   price?: number; // Base contract price/budget for this opening. Defaults to 5000 if not specified.
+  numTowers?: number; // Number of Towers in the project
+  totalFloors?: number; // Total Floors in the project
+  doorsPerFlat?: string; // Doors per Flat configuration (e.g., "A, B, C, D")
   
   // Stages
   frameFixing: FrameFixingChecklist;

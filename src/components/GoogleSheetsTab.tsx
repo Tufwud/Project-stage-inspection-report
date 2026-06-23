@@ -46,9 +46,9 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
   const [showConfirmSync, setShowConfirmSync] = useState(false);
   
   // Spreadsheet management
-  const [spreadsheetId, setSpreadsheetId] = useState<string>('1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o');
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>('https://docs.google.com/spreadsheets/d/1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o/edit');
-  const [spreadsheetTitle, setSpreadsheetTitle] = useState('SDTower Project tracking_ver1');
+  const [spreadsheetId, setSpreadsheetId] = useState<string>('1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM');
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>('https://docs.google.com/spreadsheets/d/1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM/edit');
+  const [spreadsheetTitle, setSpreadsheetTitle] = useState('SDTower Project tracking_ app Data');
   
   const [driveSheets, setDriveSheets] = useState<Array<{ id: string; name: string }>>([]);
   const [isSearchingDrive, setIsSearchingDrive] = useState(false);
@@ -128,10 +128,15 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
     setIsSearchingDrive(true);
     try {
       const files = await findExistingSpreadsheets(accessToken);
-      // Filter out any files containing "Door Quality" or "Compliance Tracker" to keep search clean
+      // Filter out files containing "Door Quality", "Compliance Tracker" or legacy versions like "ver1" and "June" to keep the options clean
       const filtered = files.filter(f => {
         const nameLower = f.name.toLowerCase();
-        return !nameLower.includes('door quality compliance') && !nameLower.includes('compliance tracker');
+        return (
+          !nameLower.includes('door quality compliance') && 
+          !nameLower.includes('compliance tracker') &&
+          !nameLower.includes('ver1') &&
+          !nameLower.includes('june')
+        );
       });
       setDriveSheets(filtered);
     } catch (e) {
@@ -264,14 +269,14 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
    */
   const getPreviewConsolidatedData = () => {
     const headers = [
-      'Sales Order No',
+      'Sales Order / OA',
       'SO Details',
-      'Total Rooms',
-      'Frame Fixing Rate',
-      'Door Fixing Rate',
-      'Hardware Rate',
-      'Handover Completed',
-      'Weighted Compliance'
+      'Total Active Rooms',
+      'Frame Fixing Progress %',
+      'Door Fixing Progress %',
+      'Hardware Fixing Progress %',
+      'Handover Progress %',
+      'Overall Weighted Score'
     ];
 
     const oaGroups: { [oaNo: string]: FlatRecord[] } = {};
@@ -465,31 +470,31 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
                   
                    <div className="space-y-2">
                     {/* OPTION 0: Default SDTower Project Workbook */}
-                    <label className={`w-full block p-3 rounded-xl border-2 hover:bg-zinc-50 relative cursor-pointer font-sans transition ${
-                      spreadsheetId === '1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o'
+                     <label className={`w-full block p-3 rounded-xl border-2 hover:bg-zinc-50 relative cursor-pointer font-sans transition ${
+                      spreadsheetId === '1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM'
                         ? 'border-emerald-600 bg-emerald-50/20' 
                         : 'border-zinc-200 bg-white'
                     }`}>
                       <input 
                         type="radio" 
                         name="sheetDestination" 
-                        checked={spreadsheetId === '1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o'}
+                        checked={spreadsheetId === '1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM'}
                         onChange={() => {
-                          setSpreadsheetId('1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o');
-                          setSpreadsheetUrl('https://docs.google.com/spreadsheets/d/1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o/edit');
-                          setSpreadsheetTitle('SDTower Project tracking_ver1');
+                          setSpreadsheetId('1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM');
+                          setSpreadsheetUrl('https://docs.google.com/spreadsheets/d/1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM/edit');
+                          setSpreadsheetTitle('SDTower Project tracking_ app Data');
                         }}
                         className="sr-only"
                       />
                       <div className="flex items-center gap-2.5">
                         <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                          spreadsheetId === '1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o' ? 'border-emerald-600 text-emerald-600 font-black text-xs' : 'border-zinc-300'
+                          spreadsheetId === '1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM' ? 'border-emerald-600 text-emerald-600 font-black text-xs' : 'border-zinc-300'
                         }`}>
-                          {spreadsheetId === '1JdJc-McGlRJ-Xh4vbKcjKTLYMdqKsMx-dk7HcDY-52o' && "✓"}
+                          {spreadsheetId === '1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM' && "✓"}
                         </span>
                         <div>
-                          <span className="block text-xs font-extrabold text-zinc-850">SDTower Project tracking_ver1 (Default)</span>
-                          <span className="block text-[10px] text-zinc-400 font-medium">Stream to verified Google Workbook ID: 1JdJc...</span>
+                          <span className="block text-xs font-extrabold text-zinc-850">SDTower Project tracking_ app Data (Default)</span>
+                          <span className="block text-[10px] text-zinc-400 font-medium">Stream to verified Google Workbook ID: 1elrqu...</span>
                         </div>
                       </div>
                     </label>
@@ -507,7 +512,7 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
                         onChange={() => {
                           setSpreadsheetId('');
                           setSpreadsheetUrl('');
-                          setSpreadsheetTitle(`SDTower Project tracking_ver1 - ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`);
+                          setSpreadsheetTitle(`SDTower Project tracking_ app Data - ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`);
                         }}
                         className="sr-only"
                       />
