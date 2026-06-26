@@ -183,11 +183,7 @@ export default function BackgroundValuesTab({
     const digitsOnly = cleanedSONo.replace('SO-', '');
     const formattedSO = `SO-${digitsOnly}`;
 
-    const tNum = parseInt(numTowers);
-    if (isNaN(tNum) || tNum <= 0 || tNum > 10) {
-      setFormError("Number of towers must be set between 1 and 10*");
-      return;
-    }
+    const tNum = parseInt(numTowers) || 1;
 
     const floorsNum = parseInt(totalFloors);
     if (isNaN(floorsNum) || floorsNum <= 0 || floorsNum > 30) {
@@ -305,13 +301,10 @@ export default function BackgroundValuesTab({
                   </label>
                   <input
                     type="number"
-                    min="1"
-                    max="10"
                     value={numTowers}
                     onChange={(e) => setNumTowers(e.target.value)}
                     placeholder="e.g. 2"
                     className="w-full px-3.5 py-2.5 bg-white border border-zinc-205 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 transition"
-                    required
                   />
                   <p className="text-[10px] text-zinc-400">Towers will be named Tower 01, Tower 02 etc.</p>
                 </div>
