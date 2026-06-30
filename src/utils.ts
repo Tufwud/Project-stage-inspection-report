@@ -418,6 +418,26 @@ function parseState(val: string): boolean | QualitativeState {
   return 'not_started';
 }
 
+// Robust CSV line parser that handles commas inside quotes and empty fields correctly
+export function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
 // Parse imported CSV into FlatRecord objects
 export function parseCSVToFlats(csvContent: string): FlatRecord[] {
   const lines = csvContent.split(/\r?\n/).filter(l => l.trim() !== '');
@@ -440,8 +460,7 @@ export function parseCSVToFlats(csvContent: string): FlatRecord[] {
   const parsedRecords: FlatRecord[] = [];
 
   dataLines.forEach((line, index) => {
-    const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
-    const item = matches.map(m => m.trim().replace(/^"|"$/g, ''));
+    const item = parseCSVLine(line).map(m => m.trim().replace(/^"|"$/g, ''));
     
     if (item.length < 7) return; // incomplete metadata row
 

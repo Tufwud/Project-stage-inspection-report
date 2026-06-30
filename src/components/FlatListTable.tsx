@@ -27,6 +27,7 @@ export default function FlatListTable({
   onClearGridFilters
 }: FlatListTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewFinderQuery, setViewFinderQuery] = useState('');
   const [towerFilter, setTowerFilter] = useState<string>('all');
   const [floorFilter, setFloorFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -36,6 +37,9 @@ export default function FlatListTable({
   // Contractor stage-wise state filters
   const [contractorSearch, setContractorSearch] = useState('');
   const [contractorStage, setContractorStage] = useState<'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover'>('any');
+
+  // Dynamically derive towers list from flats
+  const dynamicTowers = Array.from(new Set(flats.map(f => f.towerId))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
   // Multi-level filtering!
   const filteredFlats = flats.filter(flat => {
@@ -159,6 +163,64 @@ export default function FlatListTable({
 
       {/* Inputs Filtering Bar */}
       <div className="space-y-3 bg-zinc-50 p-3 sm:p-4 rounded-xl border border-zinc-100">
+        
+        {/* Dedicated View Finder bar */}
+        <div className="space-y-1.5 pb-2 border-b border-zinc-200/50">
+          <label className="block text-[10px] font-bold text-indigo-750 uppercase tracking-wider">
+            🔍 View Finder / Unique ID Lookup
+          </label>
+          <div className="relative">
+            <span className="absolute left-3.5 top-2.5 text-indigo-500 font-mono text-[11px] font-bold select-none">ID:</span>
+            <input
+              type="text"
+              placeholder="Paste exact Door ID or scan QR code (e.g., SO-387026/Tower 01/1st Floor/101/Main Door)..."
+              value={viewFinderQuery}
+              onChange={(e) => setViewFinderQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2 bg-white border border-indigo-200 focus:border-indigo-500 rounded-xl text-xs font-semibold text-zinc-850 focus:outline-none transition-all placeholder:text-zinc-400 focus:ring-1 focus:ring-indigo-500"
+            />
+            {viewFinderQuery && (
+              <button 
+                onClick={() => setViewFinderQuery('')}
+                className="absolute right-3 top-2.5 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 uppercase"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          
+          {/* View Finder Match Banner */}
+          {(() => {
+            const q = viewFinderQuery.trim().toLowerCase();
+            if (!q) return null;
+            const match = flats.find(f => f.id.toLowerCase() === q || f.id.toLowerCase().includes(q));
+            if (!match) {
+              return (
+                <p className="text-[10px] text-amber-600 font-semibold italic">
+                  ⚠ No matching record found. Ensure the SO prefix, tower spelling, and floor match the ID layout exactly.
+                </p>
+              );
+            }
+            return (
+              <div className="mt-1.5 p-2 px-3 bg-emerald-50/80 border border-emerald-150 text-xs font-bold rounded-lg flex items-center justify-between gap-3 animate-fadeIn">
+                <div className="flex items-center gap-2 text-emerald-950 truncate">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></span>
+                  <span className="truncate">🎯 <strong>Found record!</strong> Tower {match.towerId}, Level {match.floor}, Flat {match.flatNo} ({match.doorName})</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectFlat(match);
+                    setViewFinderQuery('');
+                  }}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[10px] font-black uppercase transition shrink-0 shadow-3xs cursor-pointer"
+                >
+                  Open Checklist
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           {/* Search */}
           <div className="relative">
@@ -181,7 +243,7 @@ export default function FlatListTable({
               className="w-full pl-16 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 font-semibold text-zinc-700"
             >
               <option value="all">ALL TOWERS</option>
-              {TOWERS_LIST.map(t => <option key={t} value={t}>{t}</option>)}
+              {dynamicTowers.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
 

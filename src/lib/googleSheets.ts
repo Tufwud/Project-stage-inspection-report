@@ -226,7 +226,7 @@ export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
 
   // Row 1: Header groupings
   const row1 = [
-    '', '', '', '', '', '', '', '', '', '', '', // Identifiers (11 columns: ID, SO No, SO Details, Towers, Floors, Flats/Floor, Doors/Flat, Tower ID, Floor Location, Flat No, Door Spec)
+    '', '', '', '', '', '', '', '', '', '', '', '', '', // Identifiers (13 columns: ID, SO No, SO Details, Towers, Floors, Flats/Floor, Doors/Flat, Tower ID, Floor Location, Flat No, Door Spec, Supervisor, Contractor)
     'Frame Fixing Stage Checkpoints', '', '', '', '', '', // H-M -> Now shifted but maintains exact checkbox column spans (6 cols)
     'Door Fixing Stage Checkpoints', '', '', '', '', '',  // 6 cols
     'Hardware Fixing Stage Checkpoints', '', '', '', '', '', '', '', // 8 cols
@@ -246,6 +246,8 @@ export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
     'Floor Location',
     'Flat No',
     'Door / Opening Specification',
+    'Project Supervisor',
+    'Contractor / Agency Partner',
 
     // Frame fixing
     'Fastener Fixing (✓/✗)',
@@ -304,6 +306,8 @@ export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
       flat.floor,
       flat.flatNo,
       flat.doorName,
+      flat.supervisor || 'N/A',
+      flat.contractor || 'N/A',
 
       // Frame fixing checklist values
       renderCellState(flat.frameFixing.fastenerFixing),

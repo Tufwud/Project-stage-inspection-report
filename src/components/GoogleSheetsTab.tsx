@@ -49,6 +49,7 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
   const [spreadsheetId, setSpreadsheetId] = useState<string>('1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM');
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>('https://docs.google.com/spreadsheets/d/1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM/edit');
   const [spreadsheetTitle, setSpreadsheetTitle] = useState('SDTower Project tracking_ app Data');
+  const [fastSync, setFastSync] = useState(false);
   
   const [driveSheets, setDriveSheets] = useState<Array<{ id: string; name: string }>>([]);
   const [isSearchingDrive, setIsSearchingDrive] = useState(false);
@@ -213,39 +214,49 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
         setSpreadsheetUrl(activeUrl);
       }
 
+      // Filter and limit to up to 50 projects per master workbook
+      const allUniqueSOs = Array.from(new Set(allFlatsToSync.map(flat => flat.oaNo).filter(oa => oa && oa.trim() !== '')));
+      const uniqueSOs = allUniqueSOs.slice(0, 50);
+      const filteredFlatsToSync = allFlatsToSync.filter(flat => uniqueSOs.includes(flat.oaNo));
+
       // 2. Prepare raw quality logs
       setStatusStep('Compiling records & formatting checkboxes (Raw Quality)...');
-      const rawValues = prepareRawQualityLogsData(allFlatsToSync);
+      const rawValues = prepareRawQualityLogsData(filteredFlatsToSync);
       
       // 3. Write Raw Quality Logs
       setStatusStep('Streaming Raw Quality Logs to Google Sheets API...');
       await updateSheetValues(token, activeId, 'Raw Quality Logs!A1', rawValues);
 
-      // 4. Prepare and write Consolidated Report by orders
-      setStatusStep('Analyzing sales order ratios & preparing consolidated report formulas...');
-      const summaryValues = prepareConsolidatedReportsData(allFlatsToSync);
-      
-      setStatusStep('Writing Executive Order Compliance aggregates...');
-      await updateSheetValues(token, activeId, 'Consolidated Reports!A1', summaryValues);
+      if (!fastSync) {
+        // 4. Prepare and write Consolidated Report by orders
+        setStatusStep('Analyzing sales order ratios & preparing consolidated report formulas...');
+        const summaryValues = prepareConsolidatedReportsData(filteredFlatsToSync);
+        
+        setStatusStep('Writing Executive Order Compliance aggregates...');
+        await updateSheetValues(token, activeId, 'Consolidated Reports!A1', summaryValues);
 
-      // 5. Prepare and write Stage-wise Cost Breakdown
-      setStatusStep('Calculating project stage budgets & compiling cost variance reports...');
-      const costingValues = prepareStageCostingReportData(allFlatsToSync);
+        // 5. Prepare and write Stage-wise Cost Breakdown
+        setStatusStep('Calculating project stage budgets & compiling cost variance reports...');
+        const costingValues = prepareStageCostingReportData(filteredFlatsToSync);
 
-      setStatusStep('Writing Project Stage-wise Cost Breakdown aggregates...');
-      await updateSheetValues(token, activeId, 'Stage-wise Cost Breakdown!A1', costingValues);
+        setStatusStep('Writing Project Stage-wise Cost Breakdown aggregates...');
+        await updateSheetValues(token, activeId, 'Stage-wise Cost Breakdown!A1', costingValues);
+      } else {
+        setStatusStep('Fast Sync: Skipping heavy summary reports for faster execution...');
+      }
 
       // 6. Ensure separate tabs for each unique Sales Order / OA No and stream raw logs specific to them
-      setStatusStep('Identifying unique Sales Orders...');
-      const uniqueSOs = Array.from(new Set(allFlatsToSync.map(flat => flat.oaNo).filter(oa => oa && oa.trim() !== '')));
-
       if (uniqueSOs.length > 0) {
-        setStatusStep('Ensuring dedicated tabs exist in the sheet for each Sales Order...');
-        await ensureSOTabsExist(token, activeId, uniqueSOs);
+        // In Fast Sync mode, only sync the active project's tab to save precious mobile network operations
+        const activeSO = flats && flats.length > 0 ? flats[0].oaNo : uniqueSOs[0];
+        const targetSOs = fastSync ? uniqueSOs.filter(so => so === activeSO) : uniqueSOs;
 
-        for (const so of uniqueSOs) {
+        setStatusStep(`Ensuring dedicated tabs exist in the sheet for target Sales Orders...`);
+        await ensureSOTabsExist(token, activeId, targetSOs);
+
+        for (const so of targetSOs) {
           setStatusStep(`Streaming quality logs for Sales Order "${so}"...`);
-          const soFlats = allFlatsToSync.filter(flat => flat.oaNo === so);
+          const soFlats = filteredFlatsToSync.filter(flat => flat.oaNo === so);
           const soRawValues = prepareRawQualityLogsData(soFlats);
           await updateSheetValues(token, activeId, `${so}!A1`, soRawValues);
         }
@@ -253,7 +264,10 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
 
       // Finish successfully
       setStatusStep('Completed in-sync!');
-      setSuccessBanner(`Successfully synchronized ${allFlatsToSync.length} records. All tabs - "Raw Quality Logs", "Consolidated Reports", "Stage-wise Cost Breakdown", and individual Sales Order tabs (${uniqueSOs.join(', ')}) - are fully updated and synchronized!`);
+      const syncMsg = fastSync 
+        ? `Successfully Fast-Synced active Sales Order. Upgraded to master sheet workflow (handles up to 50 active projects, sliced from ${allUniqueSOs.length})!`
+        : `Successfully synchronized ${filteredFlatsToSync.length} records across up to 50 projects (sliced from ${allUniqueSOs.length} projects). All tabs updated!`;
+      setSuccessBanner(syncMsg);
       fetchDriveFiles(token); // refresh file list
     } catch (err: any) {
       console.error('Error synchronizing spreadsheet:', err);
@@ -589,6 +603,34 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
                   </div>
                 )}
 
+                {/* Mobile App Fast Sync Switch */}
+                <div className="p-3.5 bg-indigo-50/50 border border-indigo-150 rounded-xl space-y-1.5 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="block text-xs font-extrabold text-indigo-950">Mobile App Fast Sync</span>
+                      <span className="block text-[10px] text-zinc-500 font-medium leading-none mt-1">
+                        Updates Raw Quality Logs & Active Sales Order tab only
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFastSync(!fastSync)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer shrink-0 ${
+                        fastSync ? 'bg-indigo-600' : 'bg-zinc-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          fastSync ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-indigo-900/70 font-medium leading-normal pt-1.5 border-t border-indigo-100/50">
+                    💡 Perfect for sites with low cellular connectivity. Bypasses heavy formula compilation, reducing API load and speeding up transfers by up to 90%! Supports up to 50 active projects per master workbook.
+                  </p>
+                </div>
+
                 {/* ACTION BUTTON */}
                 <div className="pt-2">
                   <button
@@ -784,17 +826,35 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
                 </div>
               </div>
 
-              <div className="bg-zinc-50/80 border border-zinc-150 rounded-xl p-4 space-y-2 text-left">
-                <span className="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Worksheets to sync</span>
+              <div className="bg-zinc-50/80 border border-zinc-150 rounded-xl p-4 space-y-2 text-left animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <span className="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Worksheets to sync</span>
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${fastSync ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                    {fastSync ? 'Fast Sync Mode' : 'Standard Full Sync'}
+                  </span>
+                </div>
                 <ul className="text-xs font-semibold text-zinc-700 space-y-1.5">
                   <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                     <span>Tab 1: <strong>"Raw Quality Logs"</strong> ({flats.length} checklists)</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                    <span>Tab 2: <strong>"Consolidated Reports"</strong> (Sales Order stats)</span>
-                  </li>
+                  {!fastSync ? (
+                    <>
+                      <li className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                        <span>Tab 2: <strong>"Consolidated Reports"</strong> (Sales Order stats)</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                        <span>Tab 3: <strong>"Stage-wise Cost Breakdown"</strong></span>
+                      </li>
+                    </>
+                  ) : (
+                    <li className="flex items-center gap-2 text-zinc-400 italic">
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 shrink-0" />
+                      <span>Other tabs skipped to optimize data speeds</span>
+                    </li>
+                  )}
                 </ul>
               </div>
 

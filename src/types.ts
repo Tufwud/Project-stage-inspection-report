@@ -145,6 +145,9 @@ export interface FlatRecord {
   doorFixing: DoorFixingChecklist;
   hardwareFixing: HardwareFixingChecklist;
   handover: HandoverChecklist;
+
+  supervisor?: string;
+  contractor?: string;
 }
 
 export type MilestoneKey = 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover';
@@ -219,5 +222,7 @@ export interface SavedProject {
   flatsPerFloor: number;
   doorTypesToGenerate: string[];
   doorPrices: { [code: string]: number };
+  supervisor?: string;
+  contractor?: string;
 }
 

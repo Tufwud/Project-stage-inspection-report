@@ -54,6 +54,8 @@ export default function App() {
     flatsPerFloor: number;
     doorTypesToGenerate: string[];
     doorPrices: { [code: string]: number };
+    supervisor?: string;
+    contractor?: string;
   }) => {
     // Sync current project to history first before overriding
     if (flats.length > 0) {
@@ -68,6 +70,9 @@ export default function App() {
       if (num % 10 === 3 && num % 100 !== 13) return 'rd';
       return 'th';
     };
+
+    const supervisorVal = config.supervisor?.trim() || "Aarif Taslim";
+    const contractorVal = config.contractor?.trim() || "Prabir Dhol";
 
     // Calculate total openings: Multiplying Towers * Floors * Flats/Floor * Doors/Flat
     for (let t = 1; t <= config.numTowers; t++) {
@@ -103,10 +108,12 @@ export default function App() {
               numTowers: config.numTowers,
               totalFloors: config.totalFloors,
               doorsPerFlat: config.doorTypesToGenerate.join(', '),
-              frameFixing: { fastenerFixing: 'not_started', frameLockAreaFinish: 'not_started', outsideArchitraveFixing: 'not_started', insideArchitraveFixing: 'not_started', doneBy: "Aarif Taslim", timestamp: "", contractor: "Prabir Dhol" },
-              doorFixing: { shutterEdgeFinishing: 'not_started', gapBetweenFrameAndShutter: 'not_started', iSealFixing: 'not_started', visionGlassBeatFinishing: 'not_started', doneBy: "Aarif Taslim", timestamp: "", contractor: "Prabir Dhol" },
-              hardwareFixing: { hingeFitting: 'not_started', lockWithHandleFitting: 'not_started', eyeviewInstallation: 'not_started', towerBoltInstallation: 'not_started', doorCloserInstallation: 'not_started', autoDropSealInstallation: 'not_started', doneBy: "Aarif Taslim", timestamp: "", contractor: "Prabir Dhol" },
-              handover: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "", contractor: "Prabir Dhol", doneBy: "Aarif Taslim" }
+              frameFixing: { fastenerFixing: 'not_started', frameLockAreaFinish: 'not_started', outsideArchitraveFixing: 'not_started', insideArchitraveFixing: 'not_started', doneBy: supervisorVal, timestamp: "", contractor: contractorVal },
+              doorFixing: { shutterEdgeFinishing: 'not_started', gapBetweenFrameAndShutter: 'not_started', iSealFixing: 'not_started', visionGlassBeatFinishing: 'not_started', doneBy: supervisorVal, timestamp: "", contractor: contractorVal },
+              hardwareFixing: { hingeFitting: 'not_started', lockWithHandleFitting: 'not_started', eyeviewInstallation: 'not_started', towerBoltInstallation: 'not_started', doorCloserInstallation: 'not_started', autoDropSealInstallation: 'not_started', doneBy: supervisorVal, timestamp: "", contractor: contractorVal },
+              handover: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "", contractor: contractorVal, doneBy: supervisorVal },
+              supervisor: supervisorVal,
+              contractor: contractorVal
             });
           });
         }

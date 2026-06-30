@@ -34,6 +34,8 @@ interface BackgroundValuesTabProps {
     flatsPerFloor: number;
     doorTypesToGenerate: string[];
     doorPrices: { [code: string]: number };
+    supervisor?: string;
+    contractor?: string;
   }) => void;
   doorPrices: { [code: string]: number };
   onUpdateDoorPrices: (newPrices: { [code: string]: number }) => void;
@@ -62,9 +64,12 @@ export default function BackgroundValuesTab({
   const [numTowers, setNumTowers] = useState('2');
   const [totalFloors, setTotalFloors] = useState('5');
   const [flatsPerFloor, setFlatsPerFloor] = useState('4');
+  const [supervisor, setSupervisor] = useState('');
+  const [contractor, setContractor] = useState('');
 
   // Specs & Master opening codes custom state
   const [customDoorCodes, setCustomDoorCodes] = useState('A, B, C, D');
+  const [customGenericNames, setCustomGenericNames] = useState('Main Door (MD), Bedroom 1 (BR1), Bedroom 2 (BR2), Toilet 1 (T1), Toilet 2 (T2), Balcony');
   const [useCustomCodes, setUseCustomCodes] = useState(true);
 
   // Manual doors selected fallback 
@@ -137,7 +142,7 @@ export default function BackgroundValuesTab({
   const getParsedDoorsList = () => {
     return useCustomCodes 
       ? customDoorCodes.split(',').map(item => item.trim().toUpperCase()).filter(Boolean)
-      : selectedDoors;
+      : customGenericNames.split(',').map(item => item.trim()).filter(Boolean);
   };
 
   const parsedDoors = getParsedDoorsList();
@@ -186,19 +191,24 @@ export default function BackgroundValuesTab({
     const tNum = parseInt(numTowers) || 1;
 
     const floorsNum = parseInt(totalFloors);
-    if (isNaN(floorsNum) || floorsNum <= 0 || floorsNum > 30) {
-      setFormError("Total Floors must be set between 1 and 30*");
+    if (isNaN(floorsNum) || floorsNum <= 0 || floorsNum > 150) {
+      setFormError("Total Floors must be set between 1 and 150*");
       return;
     }
 
     const flatsPerFloorNum = parseInt(flatsPerFloor);
-    if (isNaN(flatsPerFloorNum) || flatsPerFloorNum <= 0 || flatsPerFloorNum > 12) {
-      setFormError("Flats per Floor must be set between 1 and 12*");
+    if (isNaN(flatsPerFloorNum) || flatsPerFloorNum <= 0 || flatsPerFloorNum > 50) {
+      setFormError("Flats per Floor must be set between 1 and 50*");
       return;
     }
 
     if (parsedDoors.length === 0) {
       setFormError("Must check or specify at least one opening code specification*");
+      return;
+    }
+
+    if (parsedDoors.length > 30) {
+      setFormError("The doors multiplier cannot exceed 30 doors per flat*");
       return;
     }
 
@@ -210,7 +220,9 @@ export default function BackgroundValuesTab({
       totalFloors: floorsNum,
       flatsPerFloor: flatsPerFloorNum,
       doorTypesToGenerate: parsedDoors,
-      doorPrices: doorPrices
+      doorPrices: doorPrices,
+      supervisor: supervisor.trim() || undefined,
+      contractor: contractor.trim() || undefined
     });
 
     setSuccessBanner(`Successfully generated project metadata map with ${calculatedTotalOpenings} checklists!`);
@@ -218,6 +230,8 @@ export default function BackgroundValuesTab({
     // Clear form
     setPurchaseOrderNo('');
     setSoDetails('');
+    setSupervisor('');
+    setContractor('');
     
     setTimeout(() => {
       setSuccessBanner(null);
@@ -294,6 +308,34 @@ export default function BackgroundValuesTab({
                 </p>
               </div>
 
+              {/* Default Supervisor and Contractor */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-zinc-600 uppercase tracking-wide">
+                    Supervisor <span className="text-[9px] text-zinc-400 font-medium">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={supervisor}
+                    onChange={(e) => setSupervisor(e.target.value)}
+                    placeholder="e.g. Aarif Taslim"
+                    className="w-full px-3.5 py-2.5 bg-white border border-zinc-250 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-zinc-600 uppercase tracking-wide">
+                    Contractor <span className="text-[9px] text-zinc-400 font-medium">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={contractor}
+                    onChange={(e) => setContractor(e.target.value)}
+                    placeholder="e.g. Prabir Dhol"
+                    className="w-full px-3.5 py-2.5 bg-white border border-zinc-250 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+              </div>
+
                 {/* Number of Towers */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-zinc-600 uppercase tracking-wide">
@@ -317,7 +359,7 @@ export default function BackgroundValuesTab({
                   <input
                     type="number"
                     min="1"
-                    max="30"
+                    max="150"
                     value={totalFloors}
                     onChange={(e) => setTotalFloors(e.target.value)}
                     placeholder="e.g. 5"
@@ -333,7 +375,7 @@ export default function BackgroundValuesTab({
                   <input
                     type="number"
                     min="1"
-                    max="12"
+                    max="50"
                     value={flatsPerFloor}
                     onChange={(e) => setFlatsPerFloor(e.target.value)}
                     placeholder="e.g. 4"
@@ -409,29 +451,31 @@ export default function BackgroundValuesTab({
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto pt-1 custom-scroll-area">
-                      {DOOR_TYPES.slice(0, 6).map(doorName => {
-                        const isChecked = selectedDoors.includes(doorName);
-                        return (
-                          <button
-                            type="button"
-                            key={doorName}
-                            onClick={() => handleToggleDoorSelection(doorName)}
-                            className={`w-full text-left px-2.5 py-1.5 rounded-xl border flex items-center justify-between font-semibold text-xs transition ${
-                              isChecked 
-                                ? "bg-indigo-50/50 border-indigo-200 text-indigo-950" 
-                                : "bg-white border-zinc-205 text-zinc-500 hover:bg-zinc-50"
-                            }`}
-                          >
-                            <span>{doorName}</span>
-                            <span className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center text-[10px] uppercase ${
-                              isChecked ? "bg-indigo-600 border-indigo-600 text-white" : "border-zinc-300 bg-white"
-                            }`}>
-                              {isChecked ? "✓" : ""}
-                            </span>
-                          </button>
-                        );
-                      })}
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-zinc-400 font-semibold">
+                        Comma-separated opening names (e.g. Main Door, Bedroom 1, Toilet):
+                      </p>
+                      <input
+                        type="text"
+                        value={customGenericNames}
+                        onChange={(e) => setCustomGenericNames(e.target.value)}
+                        placeholder="e.g. Main Door, Bedroom 1, Toilet"
+                        className="w-full px-3 py-2 bg-white border border-zinc-250 rounded-xl text-xs font-semibold text-zinc-800 focus:outline-none focus:border-indigo-500"
+                      />
+
+                      {/* Map preview */}
+                      <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200/60 divide-y divide-zinc-200/50 text-xs text-zinc-650 space-y-1 max-h-40 overflow-y-auto">
+                        {parsedDoors.map((name, idx) => {
+                          const standardPrice = doorPrices[name] ?? 5000;
+                          return (
+                            <div key={idx} className="flex justify-between items-center py-1 text-[11px]">
+                              <span className="font-mono font-bold text-zinc-400">#{idx + 1}</span>
+                              <span className="truncate max-w-[150px] font-semibold text-zinc-700">{name}</span>
+                              <span className="font-mono text-zinc-500 font-medium">₹{standardPrice.toLocaleString()}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
