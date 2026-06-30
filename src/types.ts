@@ -113,15 +113,21 @@ export interface HardwareFixingChecklist {
 }
 
 export interface HandoverChecklist {
+  hardwareCleaning: boolean | QualitativeState;
+  plasticCoverRemoval: boolean | QualitativeState;
+  keysHandover: boolean | QualitativeState;
+  doneBy?: string;
+  contractor?: string;
+  timestamp: string;
+}
+
+export interface PaintingChecklist {
   frameCarpatchFillingSanding: boolean | QualitativeState;
   frameTouchUp: boolean | QualitativeState;
   shutterEdgeFinishing: boolean | QualitativeState;
   lockSlotAreaFinishing: boolean | QualitativeState;
   shutterTouchUp: boolean | QualitativeState;
-  hardwareCleaning: boolean | QualitativeState;
-  plasticCoverRemoval: boolean | QualitativeState;
-  keysHandover: boolean | QualitativeState;
-  doneBy?: string;
+  doneBy: string;
   contractor?: string;
   timestamp: string;
 }
@@ -144,13 +150,15 @@ export interface FlatRecord {
   frameFixing: FrameFixingChecklist;
   doorFixing: DoorFixingChecklist;
   hardwareFixing: HardwareFixingChecklist;
+  painting: PaintingChecklist;
   handover: HandoverChecklist;
 
   supervisor?: string;
   contractor?: string;
+  photos?: { [stageKey: string]: { id: string; name: string; url: string; date: string; isCamera: boolean }[] };
 }
 
-export type MilestoneKey = 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover';
+export type MilestoneKey = 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'painting' | 'handover';
 
 export interface MilestoneMeta {
   key: MilestoneKey;
@@ -196,15 +204,22 @@ export const MILESTONES: MilestoneMeta[] = [
     }
   },
   {
-    key: 'handover',
-    label: 'Handover',
-    totalSubtasks: 8,
+    key: 'painting',
+    label: 'Touch-up & Painting',
+    totalSubtasks: 5,
     subtaskLabels: {
       frameCarpatchFillingSanding: 'Frame carpatch filling & sanding',
       frameTouchUp: 'Frame Touch-up',
       shutterEdgeFinishing: 'Shutter edge finishing',
       lockSlotAreaFinishing: 'Lock slot area finishing',
       shutterTouchUp: 'Shutter Touch-up',
+    }
+  },
+  {
+    key: 'handover',
+    label: 'Handover',
+    totalSubtasks: 3,
+    subtaskLabels: {
       hardwareCleaning: 'Hardware cleaning',
       plasticCoverRemoval: 'Plastic cover removal',
       keysHandover: 'Keys handover',

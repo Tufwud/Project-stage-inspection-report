@@ -7,7 +7,8 @@ import {
   getFinancialStageProgress, 
   getFinancialStageEarned, 
   getFlatTotalCompletedCost, 
-  getFlatBasePrice 
+  getFlatBasePrice,
+  getFinancialStagePct
 } from '../utils';
 import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download, Hammer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -40,8 +41,21 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
   useEffect(() => {
     if (flat) {
       const cloned = JSON.parse(JSON.stringify(flat));
+      // Ensure painting is defined
+      if (!cloned.painting) {
+        cloned.painting = {
+          frameCarpatchFillingSanding: 'not_started',
+          frameTouchUp: 'not_started',
+          shutterEdgeFinishing: 'not_started',
+          lockSlotAreaFinishing: 'not_started',
+          shutterTouchUp: 'not_started',
+          doneBy: 'Aarif Taslim',
+          contractor: 'Prabir Dhol',
+          timestamp: ''
+        };
+      }
       // Ensure contractor defaults to "Prabir Dhol" and Inspector/doneBy to "Aarif Taslim" if blank but editable
-      ['frameFixing', 'doorFixing', 'hardwareFixing', 'handover'].forEach(key => {
+      ['frameFixing', 'doorFixing', 'hardwareFixing', 'painting', 'handover'].forEach(key => {
         if (cloned[key]) {
           if (!cloned[key].contractor) {
             cloned[key].contractor = "Prabir Dhol";
@@ -240,7 +254,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
 
         ${MILESTONES.map(milestone => {
           const mProgress = getMilestoneProgress(formData, milestone.key);
-          const activeStageData = formData[milestone.key] as any;
+          const activeStageData = (formData[milestone.key] || {}) as any;
           return `
             <div class="stage">
               <div class="stage-header">
@@ -285,7 +299,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
     };
     let score = 0;
     MILESTONES.forEach(milestone => {
-      const activeStageData = f[milestone.key] as any;
+      const activeStageData = (f[milestone.key] || {}) as any;
       Object.keys(milestone.subtaskLabels).forEach(subKey => {
         score += fetchWeight(activeStageData[subKey]);
       });
@@ -441,12 +455,12 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {[
-                { id: "frame_install", label: "Frame Install (0%)", color: "bg-emerald-500" },
-                { id: "shutter_install", label: "Shutter Install (30%)", color: "bg-blue-500" },
-                { id: "hardware", label: "Hardware (10%)", color: "bg-pink-500" },
-                { id: "architrave", label: "Architect (10%)", color: "bg-amber-500" },
-                { id: "seals_foams", label: "Sales/Forms (10%)", color: "bg-teal-500" },
-                { id: "handover", label: "Handover (8%)", color: "bg-indigo-500" }
+                { id: "frame_install", label: `Frame Install (${getFinancialStagePct("frame_install", 20)}%)`, color: "bg-emerald-500" },
+                { id: "shutter_install", label: `Shutter Install (${getFinancialStagePct("shutter_install", 30)}%)`, color: "bg-blue-500" },
+                { id: "hardware", label: `Hardware Fitting (${getFinancialStagePct("hardware", 20)}%)`, color: "bg-pink-500" },
+                { id: "architrave", label: `Architrave Fixing (${getFinancialStagePct("architrave", 10)}%)`, color: "bg-amber-500" },
+                { id: "seals_foams", label: `Seals/Foams/Desnagging (${getFinancialStagePct("seals_foams", 10)}%)`, color: "bg-teal-500" },
+                { id: "handover", label: `Handover (${getFinancialStagePct("handover", 10)}%)`, color: "bg-indigo-500" }
               ].map(stg => {
                 const pctVal = getFinancialStageProgress(formData, stg.id);
                 const earnedPrice = getFinancialStageEarned(formData, stg.id);
@@ -530,7 +544,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                   const meta = MILESTONES.find(m => m.key === activeTab);
                   if (!meta) return null;
                   
-                  const activeStageData = formData[activeTab] as any;
+                  const activeStageData = (formData[activeTab] || {}) as any;
 
                   return Object.keys(meta.subtaskLabels).map(taskKey => {
                     const currentStateKey = getSubtaskState(activeStageData[taskKey]);

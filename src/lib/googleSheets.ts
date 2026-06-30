@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
 import { FlatRecord, MILESTONES, QUALITATIVE_CHOICES, QualitativeState } from '../types';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { getFlatBasePrice, getFlatTotalCompletedCost, getFinancialStageEarned, getSubtaskWeight } from '../utils';
+import { getFlatBasePrice, getFlatTotalCompletedCost, getFinancialStageEarned, getSubtaskWeight, getFinancialStagePct } from '../utils';
 
 function renderCellState(val: any): string {
   if (val === undefined || val === null) return 'Not Started';
@@ -230,7 +230,8 @@ export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
     'Frame Fixing Stage Checkpoints', '', '', '', '', '', // H-M -> Now shifted but maintains exact checkbox column spans (6 cols)
     'Door Fixing Stage Checkpoints', '', '', '', '', '',  // 6 cols
     'Hardware Fixing Stage Checkpoints', '', '', '', '', '', '', '', // 8 cols
-    'Handover Stage Checkpoints', '', '', '', '', '', '', '', '', '' // 10 cols
+    'Touch-up & Painting Stage Checkpoints', '', '', '', '', '', '', // 7 cols
+    'Handover Stage Checkpoints', '', '', '', '' // 5 cols
   ];
 
   // Row 2: Sub-checkpoint properties
@@ -275,12 +276,16 @@ export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
     'Hardware Inspector',
     'Hardware Timestamp',
 
-    // Handover
+    // Touch-up & Painting
     'Frame Sanding & Sanding (✓/✗)',
     'Frame Touch-up (✓/✗)',
     'Shutter Edge Finishing (✓/✗)',
     'Lock Slot Area Finishing (✓/✗)',
     'Shutter Touch-up (✓/✗)',
+    'Painting Inspector',
+    'Painting Timestamp',
+
+    // Handover
     'Hardware Cleaning (✓/✗)',
     'Plastic Cover Removal (✓/✗)',
     'Keys Handover (✓/✗)',
@@ -335,16 +340,20 @@ export const prepareRawQualityLogsData = (flats: FlatRecord[]): any[][] => {
       flat.hardwareFixing.doneBy || 'N/A',
       flat.hardwareFixing.timestamp ? new Date(flat.hardwareFixing.timestamp).toLocaleString() : 'N/A',
 
+      // Touch-up & Painting values
+      renderCellState(flat.painting?.frameCarpatchFillingSanding),
+      renderCellState(flat.painting?.frameTouchUp),
+      renderCellState(flat.painting?.shutterEdgeFinishing),
+      renderCellState(flat.painting?.lockSlotAreaFinishing),
+      renderCellState(flat.painting?.shutterTouchUp),
+      flat.painting?.doneBy || 'N/A',
+      flat.painting?.timestamp ? new Date(flat.painting.timestamp).toLocaleString() : 'N/A',
+
       // Handover checklist values
-      renderCellState(flat.handover.frameCarpatchFillingSanding),
-      renderCellState(flat.handover.frameTouchUp),
-      renderCellState(flat.handover.shutterEdgeFinishing),
-      renderCellState(flat.handover.lockSlotAreaFinishing),
-      renderCellState(flat.handover.shutterTouchUp),
       renderCellState(flat.handover.hardwareCleaning),
       renderCellState(flat.handover.plasticCoverRemoval),
       renderCellState(flat.handover.keysHandover),
-      flat.handover.keysHandover ? 'Supervisor Handed Over' : 'Pending',
+      flat.handover.doneBy || 'N/A',
       flat.handover.timestamp ? new Date(flat.handover.timestamp).toLocaleString() : 'N/A'
     ];
   });
@@ -376,6 +385,8 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
     'Door Fixing Progress %',
     'Hardware Fixing Done',
     'Hardware Fixing Progress %',
+    'Touch-up & Painting Done',
+    'Touch-up & Painting Progress %',
     'Handover Completed',
     'Handover Progress %',
     'Overall Weighted Score',
@@ -393,11 +404,13 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
     let frameDoneCount = 0;
     let doorDoneCount = 0;
     let hardwareDoneCount = 0;
+    let paintingDoneCount = 0;
     let handoverDoneCount = 0;
     
     let totalFrameChecks = 0;
     let totalDoorChecks = 0;
     let totalHardwareChecks = 0;
+    let totalPaintingChecks = 0;
     let totalHandoverChecks = 0;
 
     let totalPendingChecks = 0;
@@ -424,20 +437,28 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
       totalHardwareChecks += hardwareCheckCount;
       totalPendingChecks += (6 - hardwareCheckCount);
 
+      // painting
+      const paintingCheckCount = getSubtaskWeight(flat.painting?.frameCarpatchFillingSanding) + getSubtaskWeight(flat.painting?.frameTouchUp) + getSubtaskWeight(flat.painting?.shutterEdgeFinishing) + getSubtaskWeight(flat.painting?.lockSlotAreaFinishing) + getSubtaskWeight(flat.painting?.shutterTouchUp);
+      const paintingFixed = paintingCheckCount >= 5;
+      if (paintingFixed) paintingDoneCount++;
+      totalPaintingChecks += paintingCheckCount;
+      totalPendingChecks += (5 - paintingCheckCount);
+
       // handover
-      const handoverCheckCount = getSubtaskWeight(flat.handover.frameCarpatchFillingSanding) + getSubtaskWeight(flat.handover.frameTouchUp) + getSubtaskWeight(flat.handover.shutterEdgeFinishing) + getSubtaskWeight(flat.handover.lockSlotAreaFinishing) + getSubtaskWeight(flat.handover.shutterTouchUp) + getSubtaskWeight(flat.handover.hardwareCleaning) + getSubtaskWeight(flat.handover.plasticCoverRemoval) + getSubtaskWeight(flat.handover.keysHandover);
-      const handoverFixed = handoverCheckCount >= 8;
+      const handoverCheckCount = getSubtaskWeight(flat.handover.hardwareCleaning) + getSubtaskWeight(flat.handover.plasticCoverRemoval) + getSubtaskWeight(flat.handover.keysHandover);
+      const handoverFixed = handoverCheckCount >= 3;
       if (handoverFixed) handoverDoneCount++;
       totalHandoverChecks += handoverCheckCount;
-      totalPendingChecks += (8 - handoverCheckCount);
+      totalPendingChecks += (3 - handoverCheckCount);
     });
 
     const framePercent = Math.round((totalFrameChecks / (totalRooms * 4)) * 100);
     const doorPercent = Math.round((totalDoorChecks / (totalRooms * 4)) * 100);
     const hardwarePercent = Math.round((totalHardwareChecks / (totalRooms * 6)) * 100);
-    const handoverPercent = Math.round((totalHandoverChecks / (totalRooms * 8)) * 100);
+    const paintingPercent = Math.round((totalPaintingChecks / (totalRooms * 5)) * 100);
+    const handoverPercent = Math.round((totalHandoverChecks / (totalRooms * 3)) * 100);
 
-    const overallProgress = Math.round((framePercent + doorPercent + hardwarePercent + handoverPercent) / 4);
+    const overallProgress = Math.round((framePercent + doorPercent + hardwarePercent + paintingPercent + handoverPercent) / 5);
     const status = overallProgress === 100 ? '✅ 100% Fulfilled' : overallProgress > 50 ? '👷 In Progress' : '⏳ Initialized';
 
     return [
@@ -450,6 +471,8 @@ export const prepareConsolidatedReportsData = (flats: FlatRecord[]): any[][] => 
       `${doorPercent}%`,
       `${hardwareDoneCount} of ${totalRooms}`,
       `${hardwarePercent}%`,
+      `${paintingDoneCount} of ${totalRooms}`,
+      `${paintingPercent}%`,
       `${handoverDoneCount} of ${totalRooms}`,
       `${handoverPercent}%`,
       `${overallProgress}%`,
@@ -479,12 +502,12 @@ export const prepareStageCostingReportData = (flats: FlatRecord[]): any[][] => {
   } = {};
 
   const stagesDef = [
-    { id: "frame_install", label: "Frame Installation (0%)" },
-    { id: "shutter_install", label: "Shutter Installation (30%)" },
-    { id: "hardware", label: "Hardware Fitting (10%)" },
-    { id: "architrave", label: "Architect (10%)" },
-    { id: "seals_foams", label: "Sales/Forms (10%)" },
-    { id: "handover", label: "Handover (8%)" }
+    { id: "frame_install", label: `Frame Installation (${getFinancialStagePct("frame_install", 20)}%)` },
+    { id: "shutter_install", label: `Shutter Installation (${getFinancialStagePct("shutter_install", 30)}%)` },
+    { id: "hardware", label: `Hardware Fitting (${getFinancialStagePct("hardware", 20)}%)` },
+    { id: "architrave", label: `Architrave Fixing (${getFinancialStagePct("architrave", 10)}%)` },
+    { id: "seals_foams", label: `Seals/Foams/Desnagging (${getFinancialStagePct("seals_foams", 10)}%)` },
+    { id: "handover", label: `Handover (${getFinancialStagePct("handover", 10)}%)` }
   ];
 
   flats.forEach(flat => {

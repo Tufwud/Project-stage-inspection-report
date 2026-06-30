@@ -289,6 +289,7 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
       'Frame Fixing Progress %',
       'Door Fixing Progress %',
       'Hardware Fixing Progress %',
+      'Touch-up & Painting Progress %',
       'Handover Progress %',
       'Overall Weighted Score'
     ];
@@ -304,19 +305,21 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
       const count = list.length;
       const soDetails = list[0]?.soDetails || '';
       
-      let tf = 0, td = 0, th = 0, tho = 0;
+      let tf = 0, td = 0, th = 0, tp = 0, tho = 0;
       list.forEach(flat => {
         tf += getSubtaskWeight(flat.frameFixing.fastenerFixing) + getSubtaskWeight(flat.frameFixing.frameLockAreaFinish) + getSubtaskWeight(flat.frameFixing.outsideArchitraveFixing) + getSubtaskWeight(flat.frameFixing.insideArchitraveFixing);
         td += getSubtaskWeight(flat.doorFixing.shutterEdgeFinishing) + getSubtaskWeight(flat.doorFixing.gapBetweenFrameAndShutter) + getSubtaskWeight(flat.doorFixing.iSealFixing) + getSubtaskWeight(flat.doorFixing.visionGlassBeatFinishing);
         th += getSubtaskWeight(flat.hardwareFixing.hingeFitting) + getSubtaskWeight(flat.hardwareFixing.lockWithHandleFitting) + getSubtaskWeight(flat.hardwareFixing.eyeviewInstallation) + getSubtaskWeight(flat.hardwareFixing.towerBoltInstallation) + getSubtaskWeight(flat.hardwareFixing.doorCloserInstallation) + getSubtaskWeight(flat.hardwareFixing.autoDropSealInstallation);
-        tho += getSubtaskWeight(flat.handover.frameCarpatchFillingSanding) + getSubtaskWeight(flat.handover.frameTouchUp) + getSubtaskWeight(flat.handover.shutterEdgeFinishing) + getSubtaskWeight(flat.handover.lockSlotAreaFinishing) + getSubtaskWeight(flat.handover.shutterTouchUp) + getSubtaskWeight(flat.handover.hardwareCleaning) + getSubtaskWeight(flat.handover.plasticCoverRemoval) + getSubtaskWeight(flat.handover.keysHandover);
+        tp += getSubtaskWeight(flat.painting?.frameCarpatchFillingSanding) + getSubtaskWeight(flat.painting?.frameTouchUp) + getSubtaskWeight(flat.painting?.shutterEdgeFinishing) + getSubtaskWeight(flat.painting?.lockSlotAreaFinishing) + getSubtaskWeight(flat.painting?.shutterTouchUp);
+        tho += getSubtaskWeight(flat.handover.hardwareCleaning) + getSubtaskWeight(flat.handover.plasticCoverRemoval) + getSubtaskWeight(flat.handover.keysHandover);
       });
 
       const framePct = Math.round((tf / (count * 4)) * 100) || 0;
       const doorPct = Math.round((td / (count * 4)) * 100) || 0;
       const hardPct = Math.round((th / (count * 6)) * 100) || 0;
-      const handPct = Math.round((tho / (count * 8)) * 100) || 0;
-      const weightScore = Math.round((framePct + doorPct + hardPct + handPct) / 4);
+      const paintPct = Math.round((tp / (count * 5)) * 100) || 0;
+      const handPct = Math.round((tho / (count * 3)) * 100) || 0;
+      const weightScore = Math.round((framePct + doorPct + hardPct + paintPct + handPct) / 5);
 
       return {
         oaNo,
@@ -325,6 +328,7 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
         framePct,
         doorPct,
         hardPct,
+        paintPct,
         handPct,
         weightScore
       };
@@ -759,6 +763,14 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
                         </td>
                         <td className="py-3 px-3">
                           <div className="space-y-1">
+                            <span>{row.paintPct}%</span>
+                            <div className="w-16 h-1 bg-zinc-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-pink-500 rounded-full" style={{ width: `${row.paintPct}%` }}></div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="space-y-1">
                             <span>{row.handPct}%</span>
                             <div className="w-16 h-1 bg-zinc-100 rounded-full overflow-hidden">
                               <div className="h-full bg-amber-500 rounded-full" style={{ width: `${row.handPct}%` }}></div>
@@ -774,7 +786,7 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
                     ))}
                     {previewData.rows.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="py-8 text-center text-zinc-400 font-semibold select-none">
+                        <td colSpan={9} className="py-8 text-center text-zinc-400 font-semibold select-none">
                           No active checklist records tracked to build report previews.
                         </td>
                       </tr>

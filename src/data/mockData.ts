@@ -9,6 +9,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "101",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -35,15 +36,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Karan Singh",
       timestamp: "2026-05-16T15:30:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: true,
       frameTouchUp: true,
       shutterEdgeFinishing: true,
       lockSlotAreaFinishing: true,
       shutterTouchUp: true,
+      doneBy: "Arun Paint Contractor",
+      timestamp: "2026-05-18T12:00:00Z"
+    },
+    handover: {
       hardwareCleaning: true,
       plasticCoverRemoval: true,
       keysHandover: true,
+      doneBy: "Rajesh Kumar",
       timestamp: "2026-05-18T16:00:00Z"
     }
   },
@@ -55,6 +61,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "102",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -81,15 +88,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Karan Singh",
       timestamp: "2026-05-16T17:10:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -101,6 +113,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "103",
     doorName: "Bedroom-01 Fire Door",
+    price: 4500,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -127,15 +140,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "",
       timestamp: ""
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -147,6 +165,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 2,
     flatNo: "201",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -173,15 +192,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Karan Singh",
       timestamp: "2026-05-25T14:00:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: true,
       frameTouchUp: true,
       shutterEdgeFinishing: true,
       lockSlotAreaFinishing: true,
       shutterTouchUp: true,
+      doneBy: "Arun Paint Contractor",
+      timestamp: "2026-05-28T14:00:00Z"
+    },
+    handover: {
       hardwareCleaning: true,
       plasticCoverRemoval: true,
       keysHandover: true,
+      doneBy: "Rajesh Kumar",
       timestamp: "2026-05-28T16:45:00Z"
     }
   },
@@ -193,6 +217,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 2,
     flatNo: "202",
     doorName: "Balcony Sliding Door",
+    price: 3500,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -219,15 +244,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "",
       timestamp: ""
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -239,6 +269,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "101",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -265,15 +296,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Madan Lal",
       timestamp: "2026-05-20T12:00:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: true,
       frameTouchUp: true,
       shutterEdgeFinishing: true,
       lockSlotAreaFinishing: true,
       shutterTouchUp: true,
+      doneBy: "Arun Paint Contractor",
+      timestamp: "2026-05-20T15:00:00Z"
+    },
+    handover: {
       hardwareCleaning: true,
       plasticCoverRemoval: true,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -285,6 +321,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "102",
     doorName: "Toilet / Utility Door",
+    price: 3200,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -311,15 +348,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Madan Lal",
       timestamp: "2026-05-21T11:15:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -331,6 +373,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "103",
     doorName: "Bedroom-01 Fire Door",
+    price: 4500,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -357,15 +400,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "",
       timestamp: ""
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -377,6 +425,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 2,
     flatNo: "201",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -403,15 +452,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Karan Singh",
       timestamp: "2026-05-27T10:00:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: true,
       frameTouchUp: true,
       shutterEdgeFinishing: true,
       lockSlotAreaFinishing: true,
       shutterTouchUp: true,
+      doneBy: "Vijay Paint Contractor",
+      timestamp: "2026-05-29T11:00:00Z"
+    },
+    handover: {
       hardwareCleaning: true,
       plasticCoverRemoval: true,
       keysHandover: true,
+      doneBy: "Vijay M.",
       timestamp: "2026-05-30T15:00:00Z"
     }
   },
@@ -423,6 +477,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 2,
     flatNo: "202",
     doorName: "Bedroom-01 Fire Door",
+    price: 4500,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -449,15 +504,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Karan Singh",
       timestamp: "2026-05-27T13:40:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: true,
       frameTouchUp: true,
       shutterEdgeFinishing: true,
       lockSlotAreaFinishing: true,
       shutterTouchUp: true,
+      doneBy: "Vijay Paint Contractor",
+      timestamp: "2026-05-27T18:00:00Z"
+    },
+    handover: {
       hardwareCleaning: true,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -469,6 +529,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "101",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -495,15 +556,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "",
       timestamp: ""
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -515,6 +581,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "102",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -541,15 +608,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "",
       timestamp: ""
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -561,6 +633,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 2,
     flatNo: "201",
     doorName: "Bedroom-01 Fire Door",
+    price: 4500,
     frameFixing: {
       fastenerFixing: false,
       frameLockAreaFinish: false,
@@ -587,15 +660,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "",
       timestamp: ""
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   },
@@ -607,6 +685,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "101",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -633,15 +712,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Madan Lal",
       timestamp: "2026-06-02T15:30:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: true,
       frameTouchUp: true,
       shutterEdgeFinishing: true,
       lockSlotAreaFinishing: true,
       shutterTouchUp: true,
+      doneBy: "Vijay Paint Contractor",
+      timestamp: "2026-06-04T12:00:00Z"
+    },
+    handover: {
       hardwareCleaning: true,
       plasticCoverRemoval: true,
       keysHandover: true,
+      doneBy: "Vijay M.",
       timestamp: "2026-06-05T14:45:00Z"
     }
   },
@@ -653,6 +737,7 @@ export const DEFAULT_FLATS: FlatRecord[] = [
     floor: 1,
     flatNo: "102",
     doorName: "Main Entrance (Teak Wood)",
+    price: 5000,
     frameFixing: {
       fastenerFixing: true,
       frameLockAreaFinish: true,
@@ -679,15 +764,20 @@ export const DEFAULT_FLATS: FlatRecord[] = [
       doneBy: "Madan Lal",
       timestamp: "2026-06-03T11:00:00Z"
     },
-    handover: {
+    painting: {
       frameCarpatchFillingSanding: false,
       frameTouchUp: false,
       shutterEdgeFinishing: false,
       lockSlotAreaFinishing: false,
       shutterTouchUp: false,
+      doneBy: "",
+      timestamp: ""
+    },
+    handover: {
       hardwareCleaning: false,
       plasticCoverRemoval: false,
       keysHandover: false,
+      doneBy: "",
       timestamp: ""
     }
   }

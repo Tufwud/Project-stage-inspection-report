@@ -39,7 +39,7 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
   {
     id: "frame_install",
     label: "Frame Installation",
-    pct: 0,
+    pct: 20,
     checkpoints: [
       { milestone: 'frameFixing', key: 'fastenerFixing' },
       { milestone: 'frameFixing', key: 'frameLockAreaFinish' },
@@ -56,8 +56,8 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
   },
   {
     id: "hardware",
-    label: "Hardware",
-    pct: 10,
+    label: "Hardware Fitting",
+    pct: 20,
     checkpoints: [
       { milestone: 'hardwareFixing', key: 'hingeFitting' },
       { milestone: 'hardwareFixing', key: 'lockWithHandleFitting' },
@@ -69,7 +69,7 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
   },
   {
     id: "architrave",
-    label: "Architect",
+    label: "Architrave Fixing",
     pct: 10,
     checkpoints: [
       { milestone: 'frameFixing', key: 'outsideArchitraveFixing' },
@@ -78,7 +78,7 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
   },
   {
     id: "seals_foams",
-    label: "Sales/Forms",
+    label: "Seals/Foams/Desnagging",
     pct: 10,
     checkpoints: [
       { milestone: 'doorFixing', key: 'iSealFixing' },
@@ -86,15 +86,22 @@ export const FINANCIAL_STAGES: FinancialStage[] = [
     ]
   },
   {
+    id: "painting",
+    label: "Touch-up & Painting",
+    pct: 5,
+    checkpoints: [
+      { milestone: 'painting', key: 'frameCarpatchFillingSanding' },
+      { milestone: 'painting', key: 'frameTouchUp' },
+      { milestone: 'painting', key: 'shutterEdgeFinishing' },
+      { milestone: 'painting', key: 'lockSlotAreaFinishing' },
+      { milestone: 'painting', key: 'shutterTouchUp' },
+    ]
+  },
+  {
     id: "handover",
     label: "Handover",
-    pct: 8,
+    pct: 5,
     checkpoints: [
-      { milestone: 'handover', key: 'frameCarpatchFillingSanding' },
-      { milestone: 'handover', key: 'frameTouchUp' },
-      { milestone: 'handover', key: 'shutterEdgeFinishing' },
-      { milestone: 'handover', key: 'lockSlotAreaFinishing' },
-      { milestone: 'handover', key: 'shutterTouchUp' },
       { milestone: 'handover', key: 'hardwareCleaning' },
       { milestone: 'handover', key: 'plasticCoverRemoval' },
       { milestone: 'handover', key: 'keysHandover' },
@@ -119,11 +126,25 @@ export function getFlatBasePrice(flat: FlatRecord): number {
   return flat.price !== undefined ? flat.price : 5000;
 }
 
+export function getFinancialStagePct(stageId: string, defaultPct: number): number {
+  try {
+    const saved = localStorage.getItem("door_quality_compliance_dashboard_stage_percentages");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed[stageId] === 'number') {
+        return parsed[stageId];
+      }
+    }
+  } catch (e) {}
+  return defaultPct;
+}
+
 export function getFinancialStageEarned(flat: FlatRecord, stageId: string): number {
   const stage = FINANCIAL_STAGES.find(s => s.id === stageId);
   if (!stage) return 0;
   const basePrice = getFlatBasePrice(flat);
-  const stageAllocated = (stage.pct / 100) * basePrice;
+  const pct = getFinancialStagePct(stageId, stage.pct);
+  const stageAllocated = (pct / 100) * basePrice;
   const progressPct = getFinancialStageProgress(flat, stageId);
   return Math.round(stageAllocated * (progressPct / 100));
 }
@@ -161,17 +182,21 @@ export function getMilestoneProgress(flat: FlatRecord, key: MilestoneKey): numbe
                     getSubtaskWeight(f.autoDropSealInstallation);
       return Math.round(Math.max(0, count / 6) * 100);
     }
-    case 'handover': {
-      const f = flat.handover;
+    case 'painting': {
+      const f = flat.painting || {} as any;
       const count = getSubtaskWeight(f.frameCarpatchFillingSanding) + 
                     getSubtaskWeight(f.frameTouchUp) + 
                     getSubtaskWeight(f.shutterEdgeFinishing) + 
                     getSubtaskWeight(f.lockSlotAreaFinishing) + 
-                    getSubtaskWeight(f.shutterTouchUp) + 
-                    getSubtaskWeight(f.hardwareCleaning) + 
+                    getSubtaskWeight(f.shutterTouchUp);
+      return Math.round(Math.max(0, count / 5) * 100);
+    }
+    case 'handover': {
+      const f = flat.handover;
+      const count = getSubtaskWeight(f.hardwareCleaning) + 
                     getSubtaskWeight(f.plasticCoverRemoval) + 
                     getSubtaskWeight(f.keysHandover);
-      return Math.round(Math.max(0, count / 8) * 100);
+      return Math.round(Math.max(0, count / 3) * 100);
     }
   }
 }
@@ -195,16 +220,19 @@ export function getFlatOverallProgress(flat: FlatRecord): number {
                   getSubtaskWeight(flat.hardwareFixing.doorCloserInstallation) + 
                   getSubtaskWeight(flat.hardwareFixing.autoDropSealInstallation);
 
-  const hoCount = getSubtaskWeight(flat.handover.frameCarpatchFillingSanding) + 
-                  getSubtaskWeight(flat.handover.frameTouchUp) + 
-                  getSubtaskWeight(flat.handover.shutterEdgeFinishing) + 
-                  getSubtaskWeight(flat.handover.lockSlotAreaFinishing) + 
-                  getSubtaskWeight(flat.handover.shutterTouchUp) + 
-                  getSubtaskWeight(flat.handover.hardwareCleaning) + 
+  const pCount = flat.painting ? (
+                 getSubtaskWeight(flat.painting.frameCarpatchFillingSanding) + 
+                 getSubtaskWeight(flat.painting.frameTouchUp) + 
+                 getSubtaskWeight(flat.painting.shutterEdgeFinishing) + 
+                 getSubtaskWeight(flat.painting.lockSlotAreaFinishing) + 
+                 getSubtaskWeight(flat.painting.shutterTouchUp)
+  ) : 0;
+
+  const hoCount = getSubtaskWeight(flat.handover.hardwareCleaning) + 
                   getSubtaskWeight(flat.handover.plasticCoverRemoval) + 
                   getSubtaskWeight(flat.handover.keysHandover);
 
-  const totalChecked = fCount + dCount + hwCount + hoCount;
+  const totalChecked = fCount + dCount + hwCount + pCount + hoCount;
   return Math.round(Math.max(0, totalChecked / 22) * 100);
 }
 
@@ -220,7 +248,7 @@ export function getProjectAnalysis(flats: FlatRecord[]) {
       notStartedFlatsCount: 0,
       totalProjectBudget: 0,
       totalCompletedCost: 0,
-      stageAverages: { frameFixing: 0, doorFixing: 0, hardwareFixing: 0, handover: 0 },
+      stageAverages: { frameFixing: 0, doorFixing: 0, hardwareFixing: 0, painting: 0, handover: 0 },
       towerAverages: {},
       subtaskAnalysis: []
     };
@@ -236,6 +264,7 @@ export function getProjectAnalysis(flats: FlatRecord[]) {
   let totalFF = 0;
   let totalDF = 0;
   let totalHW = 0;
+  let totalPT = 0;
   let totalHO = 0;
 
   flats.forEach(flat => {
@@ -253,6 +282,7 @@ export function getProjectAnalysis(flats: FlatRecord[]) {
     totalFF += getMilestoneProgress(flat, 'frameFixing');
     totalDF += getMilestoneProgress(flat, 'doorFixing');
     totalHW += getMilestoneProgress(flat, 'hardwareFixing');
+    totalPT += getMilestoneProgress(flat, 'painting');
     totalHO += getMilestoneProgress(flat, 'handover');
 
     totalProjectBudget += getFlatBasePrice(flat);
@@ -321,6 +351,7 @@ export function getProjectAnalysis(flats: FlatRecord[]) {
       frameFixing: Math.round(totalFF / totalFlats),
       doorFixing: Math.round(totalDF / totalFlats),
       hardwareFixing: Math.round(totalHW / totalFlats),
+      painting: Math.round(totalPT / totalFlats),
       handover: Math.round(totalHO / totalFlats)
     },
     towerAverages,
@@ -336,7 +367,8 @@ export function convertToCSV(flats: FlatRecord[]): string {
     "Frame Fixing,Frame Fixing,Frame Fixing,Frame Fixing,Frame Fixing,Frame Fixing,", // 6 cols
     "Door fixing,Door fixing,Door fixing,Door fixing,Door fixing,Door fixing,", // 6 cols
     "Hardware fixing,Hardware fixing,Hardware fixing,Hardware fixing,Hardware fixing,Hardware fixing,Hardware fixing,Hardware fixing,", // 8 cols
-    "Handover,Handover,Handover,Handover,Handover,Handover,Handover,Handover,Handover" // 9 cols
+    "Touch-up & Painting,Touch-up & Painting,Touch-up & Painting,Touch-up & Painting,Touch-up & Painting,Touch-up & Painting,Touch-up & Painting,", // 7 cols
+    "Handover,Handover,Handover,Handover,Handover" // 5 cols
   ].join("");
 
   // Line 2: Actual Keys
@@ -345,7 +377,8 @@ export function convertToCSV(flats: FlatRecord[]): string {
     "Frame Fixing - Fastener fixing", "Frame Fixing - Frame lock area finish", "Frame Fixing - Outside architrave fixing", "Frame Fixing - Inside architrave fixing", "Frame Fixing - Done By", "Frame Fixing - Timestamp",
     "Door fixing - Shutter edge finishing", "Door fixing - Gap between frame and shutter", "Door fixing - I seal fixing", "Door fixing - Vision glass beat finishing", "Door fixing - Done By", "Door fixing - Timestamp",
     "Hardware fixing - Hinge fitting", "Hardware fixing - Lock with handle fitting", "Hardware fixing - Eyeview installation", "Hardware fixing - Tower bolt installation", "Hardware fixing - Door closer installation", "Hardware fixing - Auto drop seal installation", "Hardware fixing - Done By", "Hardware fixing - Timestamp",
-    "Handover - Frame carpatch filling & sanding", "Handover - Frame Touch-up", "Handover - Shutter edge finishing", "Handover - Lock slot area finishing", "Handover - Shutter Touch-up", "Handover - Hardware cleaning", "Handover - Plastic cover removal", "Handover - Keys handover", "Handover - Timestamp"
+    "Touch-up & Painting - Frame carpatch filling & sanding", "Touch-up & Painting - Frame Touch-up", "Touch-up & Painting - Shutter edge finishing", "Touch-up & Painting - Lock slot area finishing", "Touch-up & Painting - Shutter Touch-up", "Touch-up & Painting - Done By", "Touch-up & Painting - Timestamp",
+    "Handover - Hardware cleaning", "Handover - Plastic cover removal", "Handover - Keys handover", "Handover - Done By", "Handover - Timestamp"
   ];
 
   const rows = flats.map(flat => {
@@ -386,15 +419,20 @@ export function convertToCSV(flats: FlatRecord[]): string {
       `"${flat.hardwareFixing.doneBy}"`,
       flat.hardwareFixing.timestamp,
 
+      // Touch-up & Painting
+      getSubtaskState(flat.painting?.frameCarpatchFillingSanding),
+      getSubtaskState(flat.painting?.frameTouchUp),
+      getSubtaskState(flat.painting?.shutterEdgeFinishing),
+      getSubtaskState(flat.painting?.lockSlotAreaFinishing),
+      getSubtaskState(flat.painting?.shutterTouchUp),
+      `"${flat.painting?.doneBy || ''}"`,
+      flat.painting?.timestamp || '',
+
       // Handover
-      getSubtaskState(flat.handover.frameCarpatchFillingSanding),
-      getSubtaskState(flat.handover.frameTouchUp),
-      getSubtaskState(flat.handover.shutterEdgeFinishing),
-      getSubtaskState(flat.handover.lockSlotAreaFinishing),
-      getSubtaskState(flat.handover.shutterTouchUp),
       getSubtaskState(flat.handover.hardwareCleaning),
       getSubtaskState(flat.handover.plasticCoverRemoval),
       getSubtaskState(flat.handover.keysHandover),
+      `"${flat.handover.doneBy || ''}"`,
       flat.handover.timestamp
     ].join(",");
   });
@@ -512,16 +550,21 @@ export function parseCSVToFlats(csvContent: string): FlatRecord[] {
         doneBy: item[18 + offset] || '',
         timestamp: item[19 + offset] || ''
       },
-      handover: {
+      painting: {
         frameCarpatchFillingSanding: parseState(item[20 + offset]),
         frameTouchUp: parseState(item[21 + offset]),
         shutterEdgeFinishing: parseState(item[22 + offset]),
         lockSlotAreaFinishing: parseState(item[23 + offset]),
         shutterTouchUp: parseState(item[24 + offset]),
-        hardwareCleaning: parseState(item[25 + offset]),
-        plasticCoverRemoval: parseState(item[26 + offset]),
-        keysHandover: parseState(item[27 + offset]),
-        timestamp: item[28 + offset] || ''
+        doneBy: item[25 + offset] || '',
+        timestamp: item[26 + offset] || ''
+      },
+      handover: {
+        hardwareCleaning: parseState(item[27 + offset]),
+        plasticCoverRemoval: parseState(item[28 + offset]),
+        keysHandover: parseState(item[29 + offset]),
+        doneBy: item[30 + offset] || '',
+        timestamp: item[31 + offset] || ''
       }
     });
   });

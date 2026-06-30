@@ -84,17 +84,17 @@ export default function OverviewStats({ analysis, onSelectMilestone, selectedMil
       </div>
 
       {/* Stage-by-Stage / Milestones Breakdown Interactivity */}
-      <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 pb-4 border-b border-zinc-100 gap-4">
+      <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 pb-3 border-b border-zinc-100 gap-3">
           <div>
-            <h3 className="font-bold text-lg text-zinc-900 tracking-tight">Stage Completion & Milestones</h3>
-            <p className="text-sm text-zinc-500 font-medium">Click on a stage below to isolate checkmarks and identify bottlenecks.</p>
+            <h3 className="font-bold text-base text-zinc-900 tracking-tight">Stage Completion &amp; Milestones</h3>
+            <p className="text-xs text-zinc-500 font-medium">Click on any stage below to isolate checkmarks and identify bottlenecks.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {selectedMilestone && (
               <button
                 onClick={() => onSelectMilestone(null)}
-                className="text-xs font-semibold text-zinc-500 hover:text-zinc-800 transition px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200"
+                className="text-[11px] font-semibold text-zinc-550 hover:text-zinc-800 transition px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200"
               >
                 Clear Stage Filter
               </button>
@@ -102,7 +102,7 @@ export default function OverviewStats({ analysis, onSelectMilestone, selectedMil
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="flex flex-row overflow-x-auto flex-nowrap md:grid md:grid-cols-5 gap-2.5 pb-2 scrollbar-none">
           {MILESTONES.map((milestone) => {
             const isSelected = selectedMilestone === milestone.key;
             const avg = stageAverages[milestone.key as keyof typeof stageAverages] || 0;
@@ -112,40 +112,41 @@ export default function OverviewStats({ analysis, onSelectMilestone, selectedMil
               frameFixing: { border: "border-indigo-100", activeBg: "bg-indigo-50 border-indigo-400 text-indigo-950", bar: "bg-indigo-600", dot: "text-indigo-600" },
               doorFixing: { border: "border-sky-100", activeBg: "bg-sky-50 border-sky-400 text-sky-950", bar: "bg-sky-600", dot: "text-sky-600" },
               hardwareFixing: { border: "border-amber-100", activeBg: "bg-amber-50 border-amber-400 text-amber-950", bar: "bg-amber-600", dot: "text-amber-500" },
+              painting: { border: "border-pink-100", activeBg: "bg-pink-50 border-pink-400 text-pink-950", bar: "bg-pink-600", dot: "text-pink-600" },
               handover: { border: "border-emerald-100", activeBg: "bg-emerald-50 border-emerald-400 text-emerald-950", bar: "bg-emerald-600", dot: "text-emerald-500" },
-            }[milestone.key];
+            }[milestone.key] || { border: "border-zinc-100", activeBg: "bg-zinc-50 border-zinc-400 text-zinc-950", bar: "bg-zinc-600", dot: "text-zinc-650" };
 
             return (
               <button
                 key={milestone.key}
                 onClick={() => onSelectMilestone(isSelected ? null : milestone.key)}
-                className={`w-full text-left p-4 rounded-xl border transition-all duration-200 relative overflow-hidden group hover:shadow-md ${
+                className={`flex-shrink-0 w-[140px] xs:w-[155px] md:w-auto text-left p-2.5 rounded-xl border transition-all duration-200 relative overflow-hidden group hover:shadow-xs cursor-pointer ${
                   isSelected 
                     ? colors.activeBg 
                     : "border-zinc-200 bg-white hover:border-zinc-300 text-zinc-800 hover:bg-zinc-50/50"
                 }`}
               >
                 {/* Visual Accent */}
-                <div className={`absolute top-0 left-0 w-1.5 h-full ${isSelected ? colors.bar : "bg-transparent group-hover:bg-zinc-200 transition"}`}></div>
+                <div className={`absolute top-0 left-0 w-1 h-full ${isSelected ? colors.bar : "bg-transparent group-hover:bg-zinc-200 transition"}`}></div>
 
-                <div className="pl-2 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold tracking-tight text-sm">
+                <div className="pl-1.5 space-y-2">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-bold tracking-tight text-[11px] sm:text-xs md:text-[13px] truncate">
                       {milestone.label}
                     </span>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/80' : 'bg-zinc-100 text-zinc-600'}`}>
-                      {milestone.totalSubtasks} tasks
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/80' : 'bg-zinc-100 text-zinc-600'}`}>
+                      {milestone.totalSubtasks}T
                     </span>
                   </div>
 
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs text-zinc-500 font-medium font-mono">
-                      <span>Completed</span>
+                    <div className="flex items-center justify-between text-[10px] text-zinc-550 font-semibold font-mono">
+                      <span>Progress</span>
                       <span className="font-bold text-zinc-900">{avg}%</span>
                     </div>
                     
                     {/* Progress Bar Container */}
-                    <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden">
+                    <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden">
                       <div 
                         className={`h-full transition-all duration-500 ${colors.bar}`}
                         style={{ width: `${avg}%` }}
@@ -153,8 +154,8 @@ export default function OverviewStats({ analysis, onSelectMilestone, selectedMil
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] font-medium pt-1 text-zinc-400 group-hover:text-zinc-600 transition">
-                    <span>{isSelected ? "● Filter Active" : "Click to view subtask rates"}</span>
+                  <div className="flex items-center justify-between text-[9px] font-bold pt-0.5 text-zinc-450 group-hover:text-zinc-600 transition">
+                    <span>{isSelected ? "● Filtered" : "Click to view"}</span>
                     <span>→</span>
                   </div>
                 </div>

@@ -20,7 +20,9 @@ import {
   Layers,
   Sparkles,
   History,
-  FolderOpen
+  FolderOpen,
+  Users,
+  BookOpen
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -38,7 +40,9 @@ interface BackgroundValuesTabProps {
     contractor?: string;
   }) => void;
   doorPrices: { [code: string]: number };
-  onUpdateDoorPrices: (newPrices: { [code: string]: number }) => void;
+  doorNames: { [code: string]: string };
+  onUpdateDoorPrices: (newNames: { [code: string]: string }, newPrices: { [code: string]: number }) => void;
+  onUpdateFlats?: (newList: FlatRecord[]) => void;
   onClearTower: (towerId: string) => void;
   onWipeAll?: () => void;
   savedProjects: SavedProject[];
@@ -50,7 +54,9 @@ export default function BackgroundValuesTab({
   flats, 
   onGenerateProject, 
   doorPrices,
+  doorNames,
   onUpdateDoorPrices,
+  onUpdateFlats,
   onClearTower, 
   onWipeAll,
   savedProjects = [],
@@ -79,6 +85,9 @@ export default function BackgroundValuesTab({
     "Toilet 1 (T1)"
   ]);
 
+  // Configuration Sub Tab ('openings' | 'payment' | 'contractors')
+  const [configSubTab, setConfigSubTab] = useState<'openings' | 'payment' | 'contractors'>('openings');
+
   // Pricing structure local edit values
   const [editingPrices, setEditingPrices] = useState<{ [code: string]: string }>(() => {
     const pricesObj: { [code: string]: string } = {};
@@ -88,6 +97,31 @@ export default function BackgroundValuesTab({
     return pricesObj;
   });
 
+  // Name structure local edit values
+  const [editingNames, setEditingNames] = useState<{ [code: string]: string }>(() => {
+    const namesObj: { [code: string]: string } = {};
+    Object.entries(doorNames).forEach(([k, v]) => {
+      namesObj[k] = v;
+    });
+    return namesObj;
+  });
+
+  // Stage-wise payment percentages state
+  const [stagePercentages, setStagePercentages] = useState<{ [stageId: string]: number }>(() => {
+    try {
+      const saved = localStorage.getItem("door_quality_compliance_dashboard_stage_percentages");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      frame_install: 20,
+      shutter_install: 30,
+      hardware: 20,
+      architrave: 10,
+      seals_foams: 10,
+      handover: 10
+    };
+  });
+
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [priceSuccessBanner, setPriceSuccessBanner] = useState<string | null>(null);
@@ -95,6 +129,121 @@ export default function BackgroundValuesTab({
   // Confirmation modally triggered states
   const [towerToWipe, setTowerToWipe] = useState<string | null>(null);
   const [confirmWipeAll, setConfirmWipeAll] = useState(false);
+
+  // --- CONTRACTOR RULES STATE & HANDLERS ---
+  interface ContractorRule {
+    id: string;
+    towerFrom: number;
+    towerTo: number;
+    stageId: 'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover';
+    contractorName: string;
+  }
+
+  const [contractorRules, setContractorRules] = useState<ContractorRule[]>(() => {
+    try {
+      const saved = localStorage.getItem("door_quality_compliance_dashboard_contractor_rules");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [
+      { id: '1', towerFrom: 1, towerTo: 10, stageId: 'any', contractorName: 'Contractor A' },
+      { id: '2', towerFrom: 11, towerTo: 20, stageId: 'any', contractorName: 'Contractor B' },
+      { id: '3', towerFrom: 1, towerTo: 100, stageId: 'frameFixing', contractorName: 'Frame Masters Ltd' },
+      { id: '4', towerFrom: 1, towerTo: 100, stageId: 'doorFixing', contractorName: 'Shutter Tech Co' }
+    ];
+  });
+
+  const [newRuleTowerFrom, setNewRuleTowerFrom] = useState('1');
+  const [newRuleTowerTo, setNewRuleTowerTo] = useState('10');
+  const [newRuleStageId, setNewRuleStageId] = useState<'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover'>('any');
+  const [newRuleContractorName, setNewRuleContractorName] = useState('');
+
+  const handleAddContractorRule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRuleContractorName.trim()) return;
+
+    const fromNum = parseInt(newRuleTowerFrom) || 1;
+    const toNum = parseInt(newRuleTowerTo) || 1;
+
+    const rule: ContractorRule = {
+      id: Date.now().toString(),
+      towerFrom: Math.min(fromNum, toNum),
+      towerTo: Math.max(fromNum, toNum),
+      stageId: newRuleStageId,
+      contractorName: newRuleContractorName.trim()
+    };
+
+    const updated = [...contractorRules, rule];
+    setContractorRules(updated);
+    localStorage.setItem("door_quality_compliance_dashboard_contractor_rules", JSON.stringify(updated));
+    setNewRuleContractorName('');
+    
+    setPriceSuccessBanner("Contractor assignment rule added! Tap 'Apply Contractor Mapping Rules' to run it on active checklists.");
+    setTimeout(() => {
+      setPriceSuccessBanner(null);
+    }, 4000);
+  };
+
+  const handleDeleteContractorRule = (id: string) => {
+    const updated = contractorRules.filter(r => r.id !== id);
+    setContractorRules(updated);
+    localStorage.setItem("door_quality_compliance_dashboard_contractor_rules", JSON.stringify(updated));
+  };
+
+  const handleApplyContractorRules = () => {
+    if (!onUpdateFlats || flats.length === 0) {
+      setPriceSuccessBanner("No active checklists to update!");
+      setTimeout(() => setPriceSuccessBanner(null), 3500);
+      return;
+    }
+
+    const updated = flats.map(flat => {
+      // Extract numeric tower number from towerId, e.g. "Tower 03" -> 3
+      const towerMatch = flat.towerId.match(/\d+/);
+      const towerNum = towerMatch ? parseInt(towerMatch[0], 10) : 1;
+
+      // Create a shallow copy of the sections we want to update
+      const newFlat = { ...flat };
+      
+      // Let's copy each stage to avoid mutating references
+      newFlat.frameFixing = { ...flat.frameFixing };
+      newFlat.doorFixing = { ...flat.doorFixing };
+      newFlat.hardwareFixing = { ...flat.hardwareFixing };
+      newFlat.handover = { ...flat.handover };
+
+      // Find rules that apply to this flat's tower and stage
+      contractorRules.forEach(rule => {
+        const isTowerInRange = towerNum >= rule.towerFrom && towerNum <= rule.towerTo;
+        if (isTowerInRange) {
+          const name = rule.contractorName.trim();
+          if (name) {
+            if (rule.stageId === 'any') {
+              newFlat.frameFixing.contractor = name;
+              newFlat.doorFixing.contractor = name;
+              newFlat.hardwareFixing.contractor = name;
+              newFlat.handover.contractor = name;
+              newFlat.contractor = name; // Top-level flat contractor as fallback
+            } else if (rule.stageId === 'frameFixing') {
+              newFlat.frameFixing.contractor = name;
+            } else if (rule.stageId === 'doorFixing') {
+              newFlat.doorFixing.contractor = name;
+            } else if (rule.stageId === 'hardwareFixing') {
+              newFlat.hardwareFixing.contractor = name;
+            } else if (rule.stageId === 'handover') {
+              newFlat.handover.contractor = name;
+            }
+          }
+        }
+      });
+
+      return newFlat;
+    });
+
+    onUpdateFlats(updated);
+    setPriceSuccessBanner("Contractor mapping rules successfully applied to all active tower checklists!");
+    setTimeout(() => {
+      setPriceSuccessBanner(null);
+    }, 4000);
+  };
 
   // Derived current metrics to inspect
   const isProjectInitialized = flats.length > 0;
@@ -106,7 +255,13 @@ export default function BackgroundValuesTab({
       pricesObj[k] = String(v);
     });
     setEditingPrices(pricesObj);
-  }, [doorPrices]);
+
+    const namesObj: { [code: string]: string } = {};
+    Object.entries(doorNames).forEach(([k, v]) => {
+      namesObj[k] = v;
+    });
+    setEditingNames(namesObj);
+  }, [doorPrices, doorNames]);
 
   // Group current loaded data to show "Active Tower Map Breakdown"
   const getTowerBreakdown = () => {
@@ -155,20 +310,56 @@ export default function BackgroundValuesTab({
   const handleUpdateMasterPrices = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedPrices: { [code: string]: number } = {};
+    const updatedNames: { [code: string]: string } = {};
+    
     Object.entries(editingPrices).forEach(([k, v]) => {
       updatedPrices[k] = Math.max(0, parseFloat(v as string) || 0);
     });
-    onUpdateDoorPrices(updatedPrices);
-    setPriceSuccessBanner("Project master rates successfully overwritten & updated!");
+    
+    Object.entries(editingNames).forEach(([k, v]) => {
+      updatedNames[k] = (v as string).trim() || k;
+    });
+
+    onUpdateDoorPrices(updatedNames, updatedPrices);
+    setPriceSuccessBanner("Project opening names & master rates successfully aligned and updated!");
     setTimeout(() => {
       setPriceSuccessBanner(null);
     }, 4000);
+  };
+
+  const handleSavePaymentPlan = (e: React.FormEvent) => {
+    e.preventDefault();
+    const totalPctSum = Object.values(stagePercentages).reduce((sum: number, v: any) => sum + (v as number), 0);
+    if (totalPctSum !== 100) {
+      setPriceSuccessBanner(`Error: Total percentage must sum to exactly 100%! Currently it is ${totalPctSum}%.`);
+      setTimeout(() => {
+        setPriceSuccessBanner(null);
+      }, 5000);
+      return;
+    }
+
+    try {
+      localStorage.setItem("door_quality_compliance_dashboard_stage_percentages", JSON.stringify(stagePercentages));
+      setPriceSuccessBanner("Stage-wise payment percentages successfully saved!");
+      setTimeout(() => {
+        setPriceSuccessBanner(null);
+      }, 4000);
+    } catch (e) {
+      // safe fallback
+    }
   };
 
   const handlePriceFieldChange = (code: string, val: string) => {
     setEditingPrices(prev => ({
       ...prev,
       [code]: val.replace(/\D/g, '')
+    }));
+  };
+
+  const handleNameFieldChange = (code: string, val: string) => {
+    setEditingNames(prev => ({
+      ...prev,
+      [code]: val
     }));
   };
 
@@ -643,18 +834,56 @@ export default function BackgroundValuesTab({
 
       {/* RIGHT COLUMN: Master Prices / Opening Codes & Active Tower Lists */}
       <div className="lg:col-span-7 space-y-6 animate-fadeIn">
-        
-        {/* Card: Master Cost Structure Configuration - Overwriteable */}
-        <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
-              <Coins className="w-4.5 h-4.5" />
+          {/* Card: Master Cost Structure & Stage-wise Payment Configuration */}
+        <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
+                <Coins className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-zinc-850 tracking-tight">Project Budget & Stage-wise Planning</h3>
+                <p className="text-xs text-zinc-500 font-semibold font-sans">
+                  Configure custom opening codes or adjust milestone payment percentages.
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-extrabold text-base text-zinc-805 tracking-tight">Project Master Cost Structure</h3>
-              <p className="text-xs text-zinc-500 font-semibold font-sans">
-                Set and overwrite default target budget values assigned to standard opening codes (A, B, C, D, E, F).
-              </p>
+
+            {/* Sub-tab switcher */}
+            <div className="flex flex-wrap bg-zinc-100 p-1 rounded-xl text-[11px] font-bold self-start sm:self-auto gap-1">
+              <button
+                type="button"
+                onClick={() => setConfigSubTab('openings')}
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  configSubTab === 'openings'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                1. Custom Openings (A-J)
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfigSubTab('payment')}
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  configSubTab === 'payment'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                2. Stage Payment % Planning
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfigSubTab('contractors')}
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  configSubTab === 'contractors'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                3. Bulk Contractor Rules & Help
+              </button>
             </div>
           </div>
 
@@ -665,48 +894,324 @@ export default function BackgroundValuesTab({
             </div>
           )}
 
-          <form onSubmit={handleUpdateMasterPrices} className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {['A', 'B', 'C', 'D', 'E', 'F'].map((code) => {
-                const specName = DOOR_MAP[code] || "Opening Specification";
+          {configSubTab === 'openings' && (
+            <form onSubmit={handleUpdateMasterPrices} className="space-y-4">
+              <div className="text-[11px] text-zinc-500 font-semibold bg-zinc-50 p-3 rounded-xl border border-zinc-150 leading-relaxed">
+                💡 <strong>Editable Fields:</strong> Modify the specific descriptive names and target budget installation costs for codes A to J below. Any changes saved will automatically overwrite the planned structure and align any active checklist records.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[380px] overflow-y-auto pr-1">
+                {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].map((code) => {
+                  const currentName = editingNames[code] || '';
+                  const currentPrice = editingPrices[code] || '';
+                  return (
+                    <div key={code} className="p-3.5 border border-zinc-200 rounded-xl bg-zinc-50/20 hover:bg-zinc-50 transition space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[10px] uppercase font-mono bg-indigo-50 border border-indigo-100 text-indigo-700 rounded px-1.5 py-0.5">
+                          Code {code}
+                        </span>
+                        <span className="text-[9px] text-zinc-400 font-bold font-mono">ID: {code}</span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {/* Name overwrite field */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-zinc-450 font-bold uppercase">Specification Name</span>
+                          <input
+                            type="text"
+                            value={currentName}
+                            onChange={(e) => handleNameFieldChange(code, e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-semibold text-zinc-800 focus:outline-none focus:border-indigo-500"
+                            placeholder={`e.g. Specification ${code}`}
+                          />
+                        </div>
+
+                        {/* Price overwrite field */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-zinc-450 font-bold uppercase">Installation Cost (planned)</span>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1.5 text-xs font-bold text-zinc-400 font-mono">₹</span>
+                            <input
+                              type="text"
+                              value={currentPrice}
+                              onChange={(e) => handlePriceFieldChange(code, e.target.value)}
+                              className="w-full pl-6 pr-2 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-bold font-mono focus:outline-none focus:border-indigo-500"
+                              placeholder="e.g. 5000"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-zinc-100">
+                <p className="text-[10px] text-zinc-450 font-semibold leading-normal max-w-sm">
+                  *Aligns checklist door prices/names automatically. To update historical projects, reload them from history first.
+                </p>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-extrabold transition shadow-xs cursor-pointer inline-flex items-center gap-1 shrink-0"
+                >
+                  Overwrite Presets
+                </button>
+              </div>
+            </form>
+          )}
+
+          {configSubTab === 'payment' && (
+            <form onSubmit={handleSavePaymentPlan} className="space-y-5">
+              <div className="text-[11px] text-zinc-500 font-semibold bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 leading-relaxed">
+                🎯 <strong>Stage-wise Payment % Planning:</strong> Divide the total contract budget of a door across its six physical milestones. The total sum must equal exactly <strong>100%</strong> to register.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { id: 'frame_install', label: 'Frame Installation', defaultPct: 20 },
+                  { id: 'shutter_install', label: 'Shutter Installation', defaultPct: 30 },
+                  { id: 'hardware', label: 'Hardware Fitting', defaultPct: 20 },
+                  { id: 'architrave', label: 'Architrave Fixing', defaultPct: 10 },
+                  { id: 'seals_foams', label: 'Seals/Foams/Desnagging', defaultPct: 10 },
+                  { id: 'handover', label: 'Handover', defaultPct: 10 }
+                ].map((stage) => {
+                  const curPct = stagePercentages[stage.id] ?? stage.defaultPct;
+                  return (
+                    <div key={stage.id} className="p-3 border border-zinc-200 rounded-xl bg-zinc-50/40 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-zinc-750">{stage.label}</span>
+                        <span className="text-[9px] text-zinc-400 font-mono font-bold">Default: {stage.defaultPct}%</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={curPct}
+                          onChange={(e) => {
+                            const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                            setStagePercentages(prev => ({
+                              ...prev,
+                              [stage.id]: val
+                            }));
+                          }}
+                          className="w-full pr-8 pl-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-extrabold font-mono focus:outline-none focus:border-indigo-500"
+                        />
+                        <span className="absolute right-3 top-1.5 text-xs font-bold text-zinc-400 font-mono">%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Summary of sums */}
+              {(() => {
+                const totalPctSum = Object.values(stagePercentages).reduce((sum: number, v: any) => sum + (v as number), 0);
+                const isCorrect = totalPctSum === 100;
                 return (
-                  <div key={code} className="p-3 border border-zinc-200 rounded-xl bg-zinc-50/40 hover:bg-zinc-50 transition space-y-1.5 relative">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="font-bold text-[10px] uppercase font-mono bg-indigo-50 border border-indigo-100 text-indigo-700 rounded px-1.5 py-0.5">
-                        Code {code}
-                      </span>
-                      <span className="text-[9px] text-zinc-400 font-semibold truncate max-w-[60px]" title={specName}>
-                        {specName}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-zinc-150 bg-zinc-50">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-zinc-700">Planned Allocation:</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-black font-mono ${
+                        isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {totalPctSum}% / 100%
                       </span>
                     </div>
-                    
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-2 text-xs font-bold text-zinc-400 font-mono">₹</span>
-                      <input
-                        type="text"
-                        value={editingPrices[code] || ''}
-                        onChange={(e) => handlePriceFieldChange(code, e.target.value)}
-                        className="w-full pl-6 pr-2 py-1 bg-white border border-zinc-200 rounded-lg text-xs font-bold font-mono focus:outline-none focus:border-indigo-500"
-                        placeholder="e.g. 5000"
-                      />
+
+                    <div className="flex items-center gap-3">
+                      {!isCorrect && (
+                        <span className="text-[10px] text-rose-600 font-bold">
+                          ⚠️ Sum must equal exactly 100%!
+                        </span>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={!isCorrect}
+                        className={`px-4 py-2 text-white rounded-lg text-xs font-extrabold transition shadow-xs cursor-pointer ${
+                          isCorrect 
+                            ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer' 
+                            : 'bg-zinc-300 text-zinc-500 cursor-not-allowed'
+                        }`}
+                      >
+                        Save Payment Plan
+                      </button>
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              })()}
+            </form>
+          )}
 
-            <div className="flex items-center justify-between pt-1 border-t border-zinc-100">
-              <p className="text-[10px] text-zinc-400 font-semibold leading-normal max-w-sm">
-                *Assigning specific costs here pre-populates target budgets. Alterations automatically register for new generations. To rewrite existing, use the modal inside compliance grid.
-              </p>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-extrabold transition shadow-xs cursor-pointer inline-flex items-center gap-1 shrink-0"
-              >
-                Overwrite Presets
-              </button>
+          {configSubTab === 'contractors' && (
+            <div className="space-y-5 animate-fadeIn">
+              {/* Guidance Document Block */}
+              <div className="bg-amber-50/40 border border-amber-200/60 rounded-xl p-4.5 space-y-3">
+                <div className="flex items-center gap-2 text-amber-800">
+                  <BookOpen className="w-5 h-5 text-amber-600" />
+                  <h4 className="font-extrabold text-sm tracking-tight">Contractor Mapping Guidance & Best Practices</h4>
+                </div>
+                
+                <div className="text-xs text-zinc-650 leading-relaxed space-y-2">
+                  <p>
+                    By default, the system initializes all checklists with a single general contractor (e.g., <strong>Prabir Dhol</strong>). However, real-world sites assign specialized teams to different stages or specific tower groupings.
+                  </p>
+                  <p className="font-bold text-zinc-700">
+                    With these Bulk Mapping Rules, you can assign different contractors in a few clicks:
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1 text-zinc-600">
+                    <li>
+                      <strong>Stage-wise Assignment:</strong> Assign one team for <span className="font-semibold text-zinc-800 font-mono">Frame Fixing / Installation</span>, another for <span className="font-semibold text-zinc-800 font-mono">Door / Shutter Installation</span>, another for <span className="font-semibold text-zinc-800 font-mono">Hardware Fitting</span>, and another for <span className="font-semibold text-zinc-800 font-mono">De-snagging & Handover</span>.
+                    </li>
+                    <li>
+                      <strong>Tower-wise Grouping:</strong> Assign <span className="font-semibold text-zinc-800 font-mono">Contractor A</span> to Towers 1 to 10, and <span className="font-semibold text-zinc-800 font-mono">Contractor B</span> to Towers 11 to 20.
+                    </li>
+                    <li>
+                      <strong>Automatic App Integration:</strong> Rules are stored locally. They are automatically applied during <strong>new project initialization</strong>, and can also be <strong>retroactively applied</strong> to all existing active tower checklists instantly using the sync tool below!
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Add Rule Form & Current Rules Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                {/* Form column */}
+                <form onSubmit={handleAddContractorRule} className="md:col-span-5 bg-zinc-50 border border-zinc-150 rounded-xl p-4 space-y-3">
+                  <h4 className="font-bold text-xs text-zinc-850 uppercase tracking-wider">Add Mapping Rule</h4>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-zinc-550 font-bold uppercase">Tower From</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={newRuleTowerFrom}
+                        onChange={(e) => setNewRuleTowerFrom(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                        placeholder="1"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-zinc-550 font-bold uppercase">Tower To</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={newRuleTowerTo}
+                        onChange={(e) => setNewRuleTowerTo(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                        placeholder="10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-550 font-bold uppercase">Milestone Stage</label>
+                    <select
+                      value={newRuleStageId}
+                      onChange={(e: any) => setNewRuleStageId(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="any">All Milestone Stages (General)</option>
+                      <option value="frameFixing">Frame Fixing / Installation</option>
+                      <option value="doorFixing">Door / Shutter Installation</option>
+                      <option value="hardwareFixing">Hardware Fitting</option>
+                      <option value="handover">De-snagging & Handover</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-550 font-bold uppercase">Contractor Name</label>
+                    <input
+                      type="text"
+                      value={newRuleContractorName}
+                      onChange={(e) => setNewRuleContractorName(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                      placeholder="e.g. Aarav Projects Ltd"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-extrabold transition shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" /> Add Rule
+                  </button>
+                </form>
+
+                {/* Rules List Column */}
+                <div className="md:col-span-7 space-y-3">
+                  <h4 className="font-bold text-xs text-zinc-850 uppercase tracking-wider flex items-center justify-between">
+                    <span>Active Mapping Rules ({contractorRules.length})</span>
+                    <span className="text-[10px] text-zinc-450 lowercase font-semibold italic">Applied bottom-to-top</span>
+                  </h4>
+
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {contractorRules.length === 0 ? (
+                      <div className="p-6 border border-dashed border-zinc-200 rounded-xl text-center text-xs text-zinc-400 font-semibold">
+                        No custom rules configured. Defaulting to main contractor.
+                      </div>
+                    ) : (
+                      contractorRules.map((rule) => {
+                        const stageLabel = 
+                          rule.stageId === 'any' ? 'All Stages' :
+                          rule.stageId === 'frameFixing' ? 'Frame Fixing' :
+                          rule.stageId === 'doorFixing' ? 'Shutter Fixing' :
+                          rule.stageId === 'hardwareFixing' ? 'Hardware Fitting' : 'Handover';
+
+                        return (
+                          <div key={rule.id} className="flex items-center justify-between p-2.5 border border-zinc-150 rounded-xl bg-white hover:bg-zinc-50/50 transition gap-2">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-mono">
+                                  Towers {rule.towerFrom}-{rule.towerTo}
+                                </span>
+                                <span className="text-[10px] font-bold bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg font-mono">
+                                  {stageLabel}
+                                </span>
+                              </div>
+                              <p className="text-xs font-extrabold text-zinc-800">
+                                Assigned: {rule.contractorName}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteContractorRule(rule.id)}
+                              className="p-1.5 hover:bg-rose-50 hover:text-rose-600 text-zinc-400 rounded-lg transition shrink-0"
+                              title="Delete rule"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Bulk update trigger */}
+                  {isProjectInitialized && (
+                    <div className="p-3 bg-indigo-50/50 border border-indigo-150 rounded-xl space-y-2.5">
+                      <div className="text-[10px] text-indigo-800 font-semibold leading-relaxed">
+                        ⚡ <strong>Bulk Assignment Tool:</strong> Apply these {contractorRules.length} rules to override and align all {flats.length} active checklist items now.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleApplyContractorRules}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black transition shadow-xs cursor-pointer inline-flex items-center justify-center gap-1.5"
+                      >
+                        <Users className="w-4 h-4" />
+                        Apply Contractor Mapping Rules to Active Project
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </form>
+          )}
         </div>
 
         {/* Card: Active Tower Parameters & Destructive Wipes */}

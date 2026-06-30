@@ -34,7 +34,31 @@ export default function App() {
     C: 7000,
     D: 5500,
     E: 5500,
-    F: 6000
+    F: 6000,
+    G: 5000,
+    H: 5000,
+    I: 5000,
+    J: 5000
+  });
+
+  // Master custom names for Opening Codes (A to J - Editable & Overwriteable)
+  const [doorNames, setDoorNames] = useState<{ [code: string]: string }>(() => {
+    try {
+      const saved = localStorage.getItem("door_quality_compliance_dashboard_door_names");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      A: "Main Door (MD)",
+      B: "Bedroom 1 (BR1)",
+      C: "Bedroom 2 (BR2)",
+      D: "Toilet 1 (T1)",
+      E: "Toilet 2 (T2)",
+      F: "Balcony",
+      G: "Toilet 3 (T3)",
+      H: "Kitchen",
+      I: "Store Room",
+      J: "Utility Door"
+    };
   });
 
   // Grid filters
@@ -86,8 +110,8 @@ export default function App() {
           const flatNo = `${flatNumber}`;
 
           config.doorTypesToGenerate.forEach(doorCodeOrName => {
-            // CONVERT CODE TO NAME (Lookup in DOOR_MAP)
-            const realName = DOOR_MAP[doorCodeOrName] || doorCodeOrName;
+            // CONVERT CODE TO NAME (Lookup in doorNames then fallbacks)
+            const realName = doorNames[doorCodeOrName] || DOOR_MAP[doorCodeOrName] || doorCodeOrName;
 
             // Retrieve the spec cost mapped to this opening code
             const price = config.doorPrices[doorCodeOrName] ?? 5000;
@@ -111,13 +135,54 @@ export default function App() {
               frameFixing: { fastenerFixing: 'not_started', frameLockAreaFinish: 'not_started', outsideArchitraveFixing: 'not_started', insideArchitraveFixing: 'not_started', doneBy: supervisorVal, timestamp: "", contractor: contractorVal },
               doorFixing: { shutterEdgeFinishing: 'not_started', gapBetweenFrameAndShutter: 'not_started', iSealFixing: 'not_started', visionGlassBeatFinishing: 'not_started', doneBy: supervisorVal, timestamp: "", contractor: contractorVal },
               hardwareFixing: { hingeFitting: 'not_started', lockWithHandleFitting: 'not_started', eyeviewInstallation: 'not_started', towerBoltInstallation: 'not_started', doorCloserInstallation: 'not_started', autoDropSealInstallation: 'not_started', doneBy: supervisorVal, timestamp: "", contractor: contractorVal },
-              handover: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "", contractor: contractorVal, doneBy: supervisorVal },
+              painting: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', timestamp: "", contractor: contractorVal, doneBy: supervisorVal },
+              handover: { hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "", contractor: contractorVal, doneBy: supervisorVal },
               supervisor: supervisorVal,
               contractor: contractorVal
             });
           });
         }
       }
+    }
+
+    // Apply any bulk contractor assignment rules automatically
+    try {
+      const savedRules = localStorage.getItem("door_quality_compliance_dashboard_contractor_rules");
+      if (savedRules) {
+        const rules = JSON.parse(savedRules);
+        if (Array.isArray(rules) && rules.length > 0) {
+          generated.forEach(flat => {
+            const towerMatch = flat.towerId.match(/\d+/);
+            const towerNum = towerMatch ? parseInt(towerMatch[0], 10) : 1;
+            
+            rules.forEach((rule: any) => {
+              const isTowerInRange = towerNum >= rule.towerFrom && towerNum <= rule.towerTo;
+              if (isTowerInRange) {
+                const name = rule.contractorName?.trim();
+                if (name) {
+                  if (rule.stageId === 'any') {
+                    flat.frameFixing.contractor = name;
+                    flat.doorFixing.contractor = name;
+                    flat.hardwareFixing.contractor = name;
+                    flat.handover.contractor = name;
+                    flat.contractor = name;
+                  } else if (rule.stageId === 'frameFixing') {
+                    flat.frameFixing.contractor = name;
+                  } else if (rule.stageId === 'doorFixing') {
+                    flat.doorFixing.contractor = name;
+                  } else if (rule.stageId === 'hardwareFixing') {
+                    flat.hardwareFixing.contractor = name;
+                  } else if (rule.stageId === 'handover') {
+                    flat.handover.contractor = name;
+                  }
+                }
+              }
+            });
+          });
+        }
+      }
+    } catch (e) {
+      // safe fallback
     }
 
     // Save newly generated flats
@@ -129,16 +194,38 @@ export default function App() {
     saveFlats(untouched);
   };
 
-  const handleUpdateDoorPrices = (newPrices: { [code: string]: number }) => {
+  const handleUpdateDoorNamesAndPrices = (newNames: { [code: string]: string }, newPrices: { [code: string]: number }) => {
+    setDoorNames(newNames);
     setDoorPrices(newPrices);
     try {
+      localStorage.setItem("door_quality_compliance_dashboard_door_names", JSON.stringify(newNames));
       localStorage.setItem("door_quality_compliance_dashboard_door_prices", JSON.stringify(newPrices));
-    } catch (e) {
-      // safe fallback
-    }
-    // Also sync to active project in history if details are present
+    } catch (e) {}
+
+    // Align existing flats in the active project
     if (flats.length > 0) {
-      syncCurrentToHistory(flats, newPrices);
+      const updatedFlats = flats.map(flat => {
+        let matchedCode = "";
+        for (const [code, oldName] of Object.entries(doorNames)) {
+          if (flat.doorName === oldName) {
+            matchedCode = code;
+            break;
+          }
+        }
+        
+        if (matchedCode) {
+          const newName = newNames[matchedCode] || flat.doorName;
+          const newPrice = newPrices[matchedCode] ?? flat.price;
+          return {
+            ...flat,
+            doorName: newName,
+            price: newPrice
+          };
+        }
+        return flat;
+      });
+
+      saveFlats(updatedFlats, newPrices);
     }
   };
 
@@ -336,7 +423,8 @@ export default function App() {
       frameFixing: { fastenerFixing: 'not_started', frameLockAreaFinish: 'not_started', outsideArchitraveFixing: 'not_started', insideArchitraveFixing: 'not_started', doneBy: "Aarif Taslim", timestamp: "", contractor: "Prabir Dhol" },
       doorFixing: { shutterEdgeFinishing: 'not_started', gapBetweenFrameAndShutter: 'not_started', iSealFixing: 'not_started', visionGlassBeatFinishing: 'not_started', doneBy: "Aarif Taslim", timestamp: "", contractor: "Prabir Dhol" },
       hardwareFixing: { hingeFitting: 'not_started', lockWithHandleFitting: 'not_started', eyeviewInstallation: 'not_started', towerBoltInstallation: 'not_started', doorCloserInstallation: 'not_started', autoDropSealInstallation: 'not_started', doneBy: "Aarif Taslim", timestamp: "", contractor: "Prabir Dhol" },
-      handover: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "", contractor: "Prabir Dhol", doneBy: "Aarif Taslim" }
+      painting: { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', timestamp: "", contractor: "Prabir Dhol", doneBy: "Aarif Taslim" },
+      handover: { hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "", contractor: "Prabir Dhol", doneBy: "Aarif Taslim" }
     };
 
     setEditingFlat(defaultNew);
@@ -548,7 +636,9 @@ export default function App() {
               flats={flats}
               onGenerateProject={handleGenerateProject}
               doorPrices={doorPrices}
-              onUpdateDoorPrices={handleUpdateDoorPrices}
+              doorNames={doorNames}
+              onUpdateDoorPrices={handleUpdateDoorNamesAndPrices}
+              onUpdateFlats={(newList) => saveFlats(newList, doorPrices)}
               onClearTower={handleClearTower}
               onWipeAll={handleWipeAll}
               savedProjects={savedProjects}
