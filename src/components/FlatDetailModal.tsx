@@ -1135,6 +1135,12 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                     </div>
                   )}
 
+                  {googleToken ? (
+                    <div className="text-[9.5px] bg-indigo-50/50 text-indigo-900 border border-indigo-150 p-2 rounded-lg leading-relaxed font-semibold">
+                      💡 <strong>Permissions Update:</strong> If you see duplicate SO folders (like for 4068, 4109), please <strong>Sign Out</strong> in the main <strong>Google Sheets Tab</strong> and sign back in to authorize the new shared folder search permission.
+                    </div>
+                  ) : null}
+
                   {syncError && (
                     <p className="text-[9.5px] text-rose-600 font-bold font-mono bg-rose-50 border border-rose-100 p-2 rounded-lg">
                       ⚠️ {syncError}

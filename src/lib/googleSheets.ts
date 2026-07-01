@@ -21,7 +21,7 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 // Scopes for reading/writing spreadsheets and listing/creating sheets in drive
 provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-provider.addScope('https://www.googleapis.com/auth/drive.file');
+provider.addScope('https://www.googleapis.com/auth/drive');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
@@ -835,18 +835,33 @@ export const findOrCreateFolderWithQueryMatch = async (
   }
   
   // Backup: fetch broad list under parent as a fallback in case server-side 'contains' behaved unexpectedly
+  // We use pageToken pagination and a pageSize of 1000 to ensure 100% thorough scans across large master folders
   try {
-    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=files(id,name)&pageSize=100`;
-    const listRes = await fetch(listUrl, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
-    if (listRes.ok) {
-      const listData = await listRes.json();
-      const files = listData.files || [];
-      const found = files.find((f: { name: string }) => matchFn(f.name));
-      if (found) {
-        console.log(`[Backup List Match] Found folder matching in full list: ID=${found.id}, Name="${found.name}"`);
-        return found.id;
+    let pageToken: string | undefined = undefined;
+    let hasMore = true;
+    while (hasMore) {
+      let listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=nextPageToken,files(id,name)&pageSize=1000`;
+      if (pageToken) {
+        listUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
+      }
+      
+      const listRes = await fetch(listUrl, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const files = listData.files || [];
+        const found = files.find((f: { name: string }) => matchFn(f.name));
+        if (found) {
+          console.log(`[Backup Paginated Match] Found folder matching in full list: ID=${found.id}, Name="${found.name}"`);
+          return found.id;
+        }
+        pageToken = listData.nextPageToken;
+        hasMore = !!pageToken;
+      } else {
+        hasMore = false;
+        const errText = await listRes.text();
+        console.warn(`Backup list check failed for page under ${parentId}:`, errText);
       }
     }
   } catch (err) {
