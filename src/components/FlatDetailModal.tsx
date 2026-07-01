@@ -12,7 +12,7 @@ import {
 } from '../utils';
 import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download, Hammer, Camera, Image, FileText, Paperclip } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getAccessToken, googleSignIn, syncPhotosToDrive } from '../lib/googleSheets';
+import { getAccessToken, googleSignIn, syncPhotosToDrive, syncErpPdfToDrive } from '../lib/googleSheets';
 
 // Helper to get local timestamp in YYYY-MM-DDTHH:mm format
 const getLocalTimestamp = () => {
@@ -479,29 +479,34 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
       setSyncError(null);
       try {
         const photosToSync = formData.photos || {};
-        let hasBase64 = false;
+        let hasBase64Photos = false;
         for (const key of Object.keys(photosToSync)) {
           if (photosToSync[key]?.some(p => p.url.startsWith('data:'))) {
-            hasBase64 = true;
+            hasBase64Photos = true;
             break;
           }
         }
 
-        if (hasBase64) {
+        const hasBase64ErpPdf = !!(formData.erpWorkOrder && formData.erpWorkOrder.url.startsWith('data:'));
+
+        let updatedFormData = { ...formData };
+
+        if (hasBase64Photos) {
           const syncedPhotos = await syncPhotosToDrive(googleToken, formData.oaNo || '387026', photosToSync);
-          const updatedFormData = {
-            ...formData,
-            photos: syncedPhotos
-          };
-          onSave(updatedFormData);
-        } else {
-          onSave(formData);
+          updatedFormData.photos = syncedPhotos;
         }
+
+        if (hasBase64ErpPdf && formData.erpWorkOrder) {
+          const syncedPdf = await syncErpPdfToDrive(googleToken, formData.oaNo || '387026', formData.erpWorkOrder);
+          updatedFormData.erpWorkOrder = syncedPdf;
+        }
+
+        onSave(updatedFormData);
         onClose();
       } catch (err: any) {
-        console.error("Failed to sync photos during save:", err);
+        console.error("Failed to sync media to Google Drive during save:", err);
         const errMsg = err.message || err;
-        setSyncError(`Photo sync failed: ${errMsg}. Saved changes locally offline.`);
+        setSyncError(`Sync failed: ${errMsg}. Saved changes locally offline.`);
         
         // Automatically proceed with offline save so that user data is never lost due to network errors
         setTimeout(() => {
@@ -715,7 +720,15 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                 )}
                 
                 <p className="text-[9px] text-zinc-400 leading-normal font-semibold font-mono uppercase bg-zinc-100 p-2 rounded-lg border border-zinc-200/55">
-                  📂 Path: <a href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-" target="_blank" rel="noopener noreferrer" className="text-indigo-650 font-extrabold hover:underline">Google Drive (Shared Master)</a> / {oaNo4Digit} / {oaNo4Digit}-Site Supervisor / ERP_Work_Order.pdf
+                  📂 Path: {oaNo4Digit === '4027' ? (
+                    <>
+                      <a href="https://drive.google.com/drive/u/0/folders/1xcRODlPVO19nbHIlbF3tomz1ruSnaRFz" target="_blank" rel="noopener noreferrer" className="text-indigo-650 font-extrabold hover:underline">4027 - Site Supervisor Folder</a> / ERP_Work_Order.pdf
+                    </>
+                  ) : (
+                    <>
+                      <a href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-" target="_blank" rel="noopener noreferrer" className="text-indigo-650 font-extrabold hover:underline">Google Drive (Shared Master)</a> / {oaNo4Digit} / {oaNo4Digit} - Site Supervisor Folder / ERP_Work_Order.pdf
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -1129,25 +1142,41 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                   )}
 
                   {/* Directory Tree */}
-                  <div className="font-mono text-[10px] text-zinc-600 bg-white border border-zinc-200 rounded-lg p-3 space-y-1">
-                    <div className="flex items-center gap-1.5 text-zinc-400">
-                      <span>📁</span> <a href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-" target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-650 hover:underline">Google Drive (Shared Master)</a>
-                    </div>
-                    <div className="flex items-center gap-1.5 pl-3 text-zinc-500">
-                      <span>└── 📁</span> <span className="font-bold text-zinc-700">{oaNo4Digit}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 pl-6 text-zinc-650">
-                      <span>└── 📁</span> <span className="font-bold text-zinc-800">{oaNo4Digit}-Site Supervisor</span>
-                    </div>
-                    <div className="flex items-center justify-between pl-9 text-indigo-700">
-                      <div className="flex items-center gap-1.5">
-                        <span>└── 📁</span> <span className="font-extrabold text-indigo-850">Site_Installation_Photos</span>
+                  {oaNo4Digit === '4027' ? (
+                    <div className="font-mono text-[10px] text-zinc-600 bg-white border border-zinc-200 rounded-lg p-3 space-y-1">
+                      <div className="flex items-center gap-1.5 text-zinc-400">
+                        <span>📁</span> <a href="https://drive.google.com/drive/u/0/folders/1xcRODlPVO19nbHIlbF3tomz1ruSnaRFz" target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-650 hover:underline">4027 - Site Supervisor Folder</a>
                       </div>
-                      <span className="text-[8px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100/70 px-1.5 py-0.5 rounded-sm uppercase tracking-wide font-mono scale-90">
-                        Auto-Creates
-                      </span>
+                      <div className="flex items-center justify-between pl-3 text-indigo-700">
+                        <div className="flex items-center gap-1.5">
+                          <span>└── 📁</span> <span className="font-extrabold text-indigo-850">Site_Installation_Photos</span>
+                        </div>
+                        <span className="text-[8px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100/70 px-1.5 py-0.5 rounded-sm uppercase tracking-wide font-mono scale-90">
+                          Auto-Creates
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="font-mono text-[10px] text-zinc-600 bg-white border border-zinc-200 rounded-lg p-3 space-y-1">
+                      <div className="flex items-center gap-1.5 text-zinc-400">
+                        <span>📁</span> <a href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-" target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-650 hover:underline">Google Drive (Shared Master)</a>
+                      </div>
+                      <div className="flex items-center gap-1.5 pl-3 text-zinc-500">
+                        <span>└── 📁</span> <span className="font-bold text-zinc-700">{oaNo4Digit}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 pl-6 text-zinc-650">
+                        <span>└── 📁</span> <span className="font-bold text-zinc-800">{oaNo4Digit} - Site Supervisor Folder</span>
+                      </div>
+                      <div className="flex items-center justify-between pl-9 text-indigo-700">
+                        <div className="flex items-center gap-1.5">
+                          <span>└── 📁</span> <span className="font-extrabold text-indigo-850">Site_Installation_Photos</span>
+                        </div>
+                        <span className="text-[8px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100/70 px-1.5 py-0.5 rounded-sm uppercase tracking-wide font-mono scale-90">
+                          Auto-Creates
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Open in Drive action */}
                   <div className="flex items-center justify-between gap-3 pt-0.5">
@@ -1155,12 +1184,12 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                       Automatic sequential nomenclature upload target
                     </p>
                     <a
-                      href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-"
+                      href={oaNo4Digit === '4027' ? "https://drive.google.com/drive/u/0/folders/1xcRODlPVO19nbHIlbF3tomz1ruSnaRFz" : "https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[10px] font-extrabold rounded-lg transition shrink-0 shadow-sm cursor-pointer"
                     >
-                      <span>Open Shared Drive</span>
+                      <span>{oaNo4Digit === '4027' ? 'Open Supervisor Folder' : 'Open Shared Drive'}</span>
                       <span className="text-indigo-200 font-normal">→</span>
                     </a>
                   </div>

@@ -892,33 +892,40 @@ export const syncPhotosToDrive = async (
   const numericParts = oaNoFull.replace(/\D/g, '');
   const oaNo4Digit = numericParts.substring(0, 4) || '3870';
   
-  const masterFolderId = '133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-';
+  let supervisorFolderId = '';
   
-  console.log(`Starting Google Drive photo sync for SO ${oaNo4Digit} under Master Folder ${masterFolderId}...`);
-  
-  // 1. Find or create the SO folder (e.g. 4099) under the Shared Master Folder
-  const soFolderId = await findOrCreateFolderWithQueryMatch(
-    accessToken,
-    masterFolderId,
-    oaNo4Digit,
-    (name) => {
-      const cleanName = name.replace(/\s+/g, '');
-      return cleanName.startsWith(oaNo4Digit) || cleanName.includes(oaNo4Digit);
-    },
-    oaNo4Digit
-  );
-  
-  // 2. Find or create the Supervisor folder (e.g. 4099 - Site Supervisor Folder) under the SO folder
-  const supervisorFolderId = await findOrCreateFolderWithQueryMatch(
-    accessToken,
-    soFolderId,
-    'Supervisor',
-    (name) => {
-      const lower = name.toLowerCase();
-      return lower.includes('supervisor') || lower.includes('site supervisor');
-    },
-    `${oaNo4Digit} - Site Supervisor Folder`
-  );
+  if (oaNo4Digit === '4027') {
+    supervisorFolderId = '1xcRODlPVO19nbHIlbF3tomz1ruSnaRFz';
+    console.log(`[Special Mapping] Using direct supervisor folder ID for ${oaNo4Digit}: ${supervisorFolderId}`);
+  } else {
+    const masterFolderId = '133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-';
+    
+    console.log(`Starting Google Drive photo sync for SO ${oaNo4Digit} under Master Folder ${masterFolderId}...`);
+    
+    // 1. Find or create the SO folder (e.g. 4099) under the Shared Master Folder
+    const soFolderId = await findOrCreateFolderWithQueryMatch(
+      accessToken,
+      masterFolderId,
+      oaNo4Digit,
+      (name) => {
+        const cleanName = name.replace(/\s+/g, '');
+        return cleanName.startsWith(oaNo4Digit) || cleanName.includes(oaNo4Digit);
+      },
+      oaNo4Digit
+    );
+    
+    // 2. Find or create the Supervisor folder (e.g. 4099 - Site Supervisor Folder) under the SO folder
+    supervisorFolderId = await findOrCreateFolderWithQueryMatch(
+      accessToken,
+      soFolderId,
+      'Supervisor',
+      (name) => {
+        const lower = name.toLowerCase();
+        return lower.includes('supervisor') || lower.includes('site supervisor');
+      },
+      `${oaNo4Digit} - Site Supervisor Folder`
+    );
+  }
   
   // 3. Find or create the Site_Installation_Photos folder under the Supervisor folder
   const photosFolderId = await findOrCreateFolderWithQueryMatch(
@@ -961,3 +968,59 @@ export const syncPhotosToDrive = async (
   
   return updatedPhotos;
 };
+
+/**
+ * Syncs the ERP Work Order PDF (if it is a new base64 upload) to the Supervisor Folder on Google Drive.
+ */
+export const syncErpPdfToDrive = async (
+  accessToken: string,
+  oaNoFull: string,
+  erpWorkOrder: { name: string; url: string; size: string; date: string }
+): Promise<{ name: string; url: string; size: string; date: string }> => {
+  if (!erpWorkOrder || !erpWorkOrder.url || !erpWorkOrder.url.startsWith('data:')) {
+    return erpWorkOrder;
+  }
+
+  const numericParts = oaNoFull.replace(/\D/g, '');
+  const oaNo4Digit = numericParts.substring(0, 4) || '3870';
+
+  let supervisorFolderId = '';
+  if (oaNo4Digit === '4027') {
+    supervisorFolderId = '1xcRODlPVO19nbHIlbF3tomz1ruSnaRFz';
+  } else {
+    const masterFolderId = '133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-';
+    
+    // Find or create the SO folder (e.g. 4099) under the Shared Master Folder
+    const soFolderId = await findOrCreateFolderWithQueryMatch(
+      accessToken,
+      masterFolderId,
+      oaNo4Digit,
+      (name) => {
+        const cleanName = name.replace(/\s+/g, '');
+        return cleanName.startsWith(oaNo4Digit) || cleanName.includes(oaNo4Digit);
+      },
+      oaNo4Digit
+    );
+    
+    // Find or create the Supervisor folder (e.g. 4099 - Site Supervisor Folder) under the SO folder
+    supervisorFolderId = await findOrCreateFolderWithQueryMatch(
+      accessToken,
+      soFolderId,
+      'Supervisor',
+      (name) => {
+        const lower = name.toLowerCase();
+        return lower.includes('supervisor') || lower.includes('site supervisor');
+      },
+      `${oaNo4Digit} - Site Supervisor Folder`
+    );
+  }
+
+  console.log(`Uploading ERP Work Order PDF to Supervisor Folder ID: ${supervisorFolderId}...`);
+  const uploaded = await uploadImageToDrive(accessToken, erpWorkOrder.url, erpWorkOrder.name || 'ERP_Work_Order.pdf', supervisorFolderId);
+  
+  return {
+    ...erpWorkOrder,
+    url: uploaded.url
+  };
+};
+
