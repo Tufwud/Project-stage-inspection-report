@@ -1,14 +1,12 @@
 export type QualitativeState = 
   | 'not_started' 
-  | 'completed' 
   | 'approved' 
   | 'approved_remarks' 
   | 'repair_reqd' 
   | 'rework_needed' 
   | 'not_approved' 
   | 'rejected' 
-  | 'handed_over'
-  | 'not_applicable';
+  | 'handed_over';
 
 export interface QualitativeChoice {
   key: QualitativeState;
@@ -23,18 +21,6 @@ export const QUALITATIVE_CHOICES: { [key in QualitativeState]: QualitativeChoice
     label: "Not Started", 
     weight: 0.0, 
     color: "bg-zinc-100 text-zinc-650 border-zinc-200" 
-  },
-  not_applicable: {
-    key: 'not_applicable',
-    label: "Not Applicable (N/A)",
-    weight: 1.0,
-    color: "bg-zinc-100 text-zinc-400 border-zinc-200 line-through decoration-zinc-300"
-  },
-  completed: { 
-    key: 'completed', 
-    label: "Completed (The work is ready for inspection)", 
-    weight: 0.5, 
-    color: "bg-blue-50 text-blue-700 border-blue-200" 
   },
   approved: { 
     key: 'approved', 

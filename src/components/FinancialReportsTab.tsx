@@ -10,7 +10,7 @@ import {
   FINANCIAL_STAGES 
 } from '../utils';
 import { 
-  DollarSign, 
+  IndianRupee, 
   Download, 
   FileSpreadsheet, 
   Search, 
@@ -689,7 +689,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
 
         <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex items-center gap-4.5">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-            <DollarSign className="w-5 h-5" />
+            <IndianRupee className="w-5 h-5" />
           </div>
           <div>
             <span className="block text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Earned Realized Cost</span>

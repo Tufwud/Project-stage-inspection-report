@@ -48,6 +48,10 @@ interface BackgroundValuesTabProps {
   savedProjects: SavedProject[];
   onLoadProject: (soNo: string) => void;
   onDeleteProject: (soNo: string) => void;
+  onClearHistory?: () => void;
+  supervisors?: string[];
+  onAddSupervisor?: (name: string) => void;
+  onRemoveSupervisor?: (name: string) => void;
 }
 
 export default function BackgroundValuesTab({ 
@@ -61,7 +65,11 @@ export default function BackgroundValuesTab({
   onWipeAll,
   savedProjects = [],
   onLoadProject,
-  onDeleteProject
+  onDeleteProject,
+  onClearHistory,
+  supervisors = [],
+  onAddSupervisor,
+  onRemoveSupervisor
 }: BackgroundValuesTabProps) {
   
   // State for One-Time Project Creation
@@ -72,6 +80,14 @@ export default function BackgroundValuesTab({
   const [flatsPerFloor, setFlatsPerFloor] = useState('4');
   const [supervisor, setSupervisor] = useState('');
   const [contractor, setContractor] = useState('');
+
+  const supervisorList = supervisors.length > 0 ? supervisors : SUPERVISORS.filter(s => s !== "Nagesh Yadav" && s !== "Nagesh Jadav");
+
+  useEffect(() => {
+    if (!supervisor && supervisorList.length > 0) {
+      setSupervisor(supervisorList[0]);
+    }
+  }, [supervisorList, supervisor]);
 
   // Specs & Master opening codes custom state
   const [customDoorCodes, setCustomDoorCodes] = useState('A, B, C, D');
@@ -85,8 +101,8 @@ export default function BackgroundValuesTab({
     "Toilet 1 (T1)"
   ]);
 
-  // Configuration Sub Tab ('openings' | 'payment' | 'contractors')
-  const [configSubTab, setConfigSubTab] = useState<'openings' | 'payment' | 'contractors'>('openings');
+  // Configuration Sub Tab ('openings' | 'payment' | 'contractors' | 'supervisors')
+  const [configSubTab, setConfigSubTab] = useState<'openings' | 'payment' | 'contractors' | 'supervisors'>('openings');
 
   // Pricing structure local edit values
   const [editingPrices, setEditingPrices] = useState<{ [code: string]: string }>(() => {
@@ -129,6 +145,8 @@ export default function BackgroundValuesTab({
   // Confirmation modally triggered states
   const [towerToWipe, setTowerToWipe] = useState<string | null>(null);
   const [confirmWipeAll, setConfirmWipeAll] = useState(false);
+  const [confirmClearAllHistory, setConfirmClearAllHistory] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
   // --- CONTRACTOR RULES STATE & HANDLERS ---
   interface ContractorRule {
@@ -505,13 +523,16 @@ export default function BackgroundValuesTab({
                   <label className="block text-xs font-bold text-zinc-600 uppercase tracking-wide">
                     Supervisor <span className="text-[9px] text-zinc-400 font-medium">(Optional)</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={supervisor}
                     onChange={(e) => setSupervisor(e.target.value)}
-                    placeholder="e.g. Aarif Taslim"
                     className="w-full px-3.5 py-2.5 bg-white border border-zinc-250 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 transition"
-                  />
+                  >
+                    <option value="">-- Select Supervisor --</option>
+                    {supervisorList.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-zinc-600 uppercase tracking-wide">
@@ -705,14 +726,26 @@ export default function BackgroundValuesTab({
 
         {/* Sales Order Registry & History Status Card */}
         <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
-              <History className="w-4.5 h-4.5" />
+          <div className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                <History className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-zinc-800 tracking-tight">Sales Order Registry</h3>
+                <p className="text-xs text-zinc-500 font-semibold font-sans">Switch dashboards between saved orders.</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-extrabold text-base text-zinc-800 tracking-tight">Sales Order Registry</h3>
-              <p className="text-xs text-zinc-500 font-semibold font-sans">Switch dashboards between saved orders.</p>
-            </div>
+            {savedProjects.length > 0 && onClearHistory && (
+              <button
+                type="button"
+                onClick={() => setConfirmClearAllHistory(true)}
+                className="p-1.5 px-3 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg text-[11px] font-extrabold transition border border-rose-150 hover:border-transparent cursor-pointer flex items-center gap-1.5 shrink-0 animate-fadeIn"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear All
+              </button>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -770,11 +803,7 @@ export default function BackgroundValuesTab({
 
                         <button
                           type="button"
-                          onClick={() => {
-                            if (window.confirm(`Are you sure you want to delete ${project.salesOrderNo} and all its installation compliance records?`)) {
-                              onDeleteProject(project.salesOrderNo);
-                            }
-                          }}
+                          onClick={() => setProjectToDelete(project.salesOrderNo)}
                           className="p-1.5 bg-rose-50 hover:bg-rose-500 hover:text-white border border-rose-150 hover:border-transparent text-rose-600 rounded-lg text-xs transition cursor-pointer"
                           title="Delete Order History"
                         >
@@ -882,7 +911,18 @@ export default function BackgroundValuesTab({
                     : 'text-zinc-500 hover:text-zinc-800'
                 }`}
               >
-                3. Bulk Contractor Rules & Help
+                3. Bulk Contractor Rules
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfigSubTab('supervisors')}
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  configSubTab === 'supervisors'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                4. Manage Supervisors
               </button>
             </div>
           </div>
@@ -1212,6 +1252,90 @@ export default function BackgroundValuesTab({
               </div>
             </div>
           )}
+
+          {configSubTab === 'supervisors' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-indigo-50/40 border border-indigo-200/60 rounded-xl p-4.5 space-y-3">
+                <div className="flex items-center gap-2 text-indigo-900">
+                  <Users className="w-5 h-5 text-indigo-600" />
+                  <h4 className="font-extrabold text-sm tracking-tight">Supervisor Management & Workflow Integration</h4>
+                </div>
+                <p className="text-xs text-zinc-650 leading-relaxed">
+                  Manage the official site supervisors list. Adding or removing names here dynamically updates both the <strong>Project Initialization dropdown</strong> and the <strong>individual stage inspector dropdowns</strong> across all flats.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                {/* Add Supervisor Form */}
+                <div className="md:col-span-5 bg-zinc-50 border border-zinc-150 rounded-xl p-4 space-y-3">
+                  <h4 className="font-bold text-xs text-zinc-850 uppercase tracking-wider">Add New Supervisor</h4>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. Ramesh Kumar"
+                      id="new-supervisor-name-input"
+                      className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = (e.target as HTMLInputElement).value.trim();
+                          if (val && onAddSupervisor) {
+                            onAddSupervisor(val);
+                            (e.target as HTMLInputElement).value = '';
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('new-supervisor-name-input') as HTMLInputElement;
+                        const val = input?.value.trim();
+                        if (val && onAddSupervisor) {
+                          onAddSupervisor(val);
+                          input.value = '';
+                        }
+                      }}
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-extrabold transition shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" /> Add Supervisor
+                    </button>
+                  </div>
+                </div>
+
+                {/* Supervisor List */}
+                <div className="md:col-span-7 space-y-3">
+                  <h4 className="font-bold text-xs text-zinc-850 uppercase tracking-wider">
+                    Active Supervisors ({supervisorList.length})
+                  </h4>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {supervisorList.length === 0 ? (
+                      <div className="p-6 border border-dashed border-zinc-200 rounded-xl text-center text-xs text-zinc-400 font-semibold">
+                        No supervisors registered. Please add one.
+                      </div>
+                    ) : (
+                      supervisorList.map((sup) => (
+                        <div key={sup} className="flex items-center justify-between p-2.5 border border-zinc-150 rounded-xl bg-white hover:bg-zinc-50/50 transition gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                            <span className="text-xs font-bold text-zinc-850">{sup}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveSupervisor && onRemoveSupervisor(sup)}
+                            className="p-1.5 hover:bg-rose-50 hover:text-rose-600 text-zinc-400 rounded-lg transition shrink-0 cursor-pointer"
+                            title="Remove supervisor"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Card: Active Tower Parameters & Destructive Wipes */}
@@ -1399,6 +1523,82 @@ export default function BackgroundValuesTab({
               <button
                 type="button"
                 onClick={() => setConfirmWipeAll(false)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold text-xs rounded-xl border border-zinc-200 transition duration-150 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Modal Confirmation for Clearing All History */}
+      {confirmClearAllHistory && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-[2px] animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-650">
+              <div className="p-2 bg-rose-50 rounded-xl border border-rose-100">
+                <Trash2 className="w-5 h-5 text-rose-650" />
+              </div>
+              <h3 className="font-extrabold text-zinc-900 text-base leading-tight">Clear All Registry History?</h3>
+            </div>
+            
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Are you sure you want to permanently delete all registered Sales Orders from history? This action is absolutely irreversible and clears all saved projects.
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onClearHistory) onClearHistory();
+                  setConfirmClearAllHistory(false);
+                }}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs rounded-xl transition duration-150 shadow-sm cursor-pointer"
+              >
+                Yes, Clear All
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmClearAllHistory(false)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold text-xs rounded-xl border border-zinc-200 transition duration-150 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Modal Confirmation for Deleting a Single Project */}
+      {projectToDelete && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-[2px] animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-zinc-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-650">
+              <div className="p-2 bg-rose-50 rounded-xl border border-rose-100">
+                <Trash2 className="w-5 h-5 text-rose-650" />
+              </div>
+              <h3 className="font-extrabold text-zinc-900 text-base leading-tight">Delete Sales Order?</h3>
+            </div>
+            
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Are you sure you want to delete <span className="font-bold text-zinc-900 font-mono">#{projectToDelete}</span> and all its associated installation compliance records from history?
+            </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteProject(projectToDelete);
+                  setProjectToDelete(null);
+                }}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold text-xs rounded-xl transition duration-150 shadow-sm cursor-pointer"
+              >
+                Yes, Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setProjectToDelete(null)}
                 className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 active:bg-zinc-300 text-zinc-700 font-bold text-xs rounded-xl border border-zinc-200 transition duration-150 cursor-pointer"
               >
                 Cancel

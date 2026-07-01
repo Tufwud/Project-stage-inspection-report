@@ -787,7 +787,6 @@ export const SUPERVISORS = [
   "Aarif Taslim",
   "Vivek Laxman",
   "Sandip Vishwakarma",
-  "Nagesh Yadav",
   "Surya Pratap Singh",
   "Radheshyam",
   "Rahul Sharma",

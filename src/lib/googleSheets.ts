@@ -653,3 +653,311 @@ export const ensureSOTabsExist = async (
     return [];
   }
 };
+
+/**
+ * Finds a folder by name inside a parent, or creates it.
+ * If parentId is specified but not authorized or fails, it falls back to root or normal creation.
+ */
+export const findOrCreateFolder = async (
+  accessToken: string,
+  name: string,
+  parentId?: string
+): Promise<string> => {
+  let query = `name = '${name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  if (parentId) {
+    query += ` and '${parentId}' in parents`;
+  }
+  
+  try {
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=files(id)`;
+    const searchRes = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      if (searchData.files && searchData.files.length > 0) {
+        return searchData.files[0].id;
+      }
+    }
+  } catch (err) {
+    console.warn(`Querying folder ${name} failed:`, err);
+  }
+  
+  // Create folder
+  const createPayload: any = {
+    name: name,
+    mimeType: 'application/vnd.google-apps.folder'
+  };
+  if (parentId) {
+    createPayload.parents = [parentId];
+  }
+  
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(createPayload)
+  });
+  
+  if (!createRes.ok) {
+    // If it failed and we had a parent, try to create at root
+    if (parentId) {
+      console.warn(`Failed to create folder inside parent ${parentId}, creating at root:`);
+      return findOrCreateFolder(accessToken, name);
+    }
+    const errText = await createRes.text();
+    throw new Error(`Failed to create folder ${name}: ${errText}`);
+  }
+  
+  const createData = await createRes.json();
+  return createData.id;
+};
+
+/**
+ * Uploads a base64 image data URL to Google Drive using multipart upload.
+ */
+export const uploadImageToDrive = async (
+  accessToken: string,
+  base64DataUrl: string,
+  filename: string,
+  parentFolderId: string
+): Promise<{ id: string; url: string }> => {
+  const base64Parts = base64DataUrl.split(',');
+  const base64Content = base64Parts[1] || base64Parts[0];
+  const mimeType = base64DataUrl.match(/:(.*?);/)?.[1] || 'image/png';
+  
+  const boundary = 'foo_bar_baz_upload';
+  const delimiter = `\r\n--${boundary}\r\n`;
+  const close_delim = `\r\n--${boundary}--`;
+  
+  const metadata = {
+    name: filename,
+    mimeType: mimeType,
+    parents: [parentFolderId]
+  };
+  
+  const multipartBody = [
+    delimiter,
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+    JSON.stringify(metadata),
+    delimiter,
+    `Content-Type: ${mimeType}\r\n`,
+    'Content-Transfer-Encoding: base64\r\n\r\n',
+    base64Content,
+    close_delim
+  ].join('');
+  
+  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink,webContentLink', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`
+    },
+    body: multipartBody
+  });
+  
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to upload image ${filename}: ${errText}`);
+  }
+  
+  const data = await response.json();
+  // Get webContentLink (direct download) or webViewLink
+  const fileUrl = data.webContentLink || data.webViewLink || `https://drive.google.com/uc?id=${data.id}`;
+  
+  return {
+    id: data.id,
+    url: fileUrl
+  };
+};
+
+/**
+ * Lists all non-trashed subfolders under a specific parent folder ID on Google Drive.
+ */
+export const listSubfolders = async (
+  accessToken: string,
+  parentId: string
+): Promise<{ id: string; name: string }[]> => {
+  const query = `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=files(id,name)`;
+  
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Failed to list folders under ${parentId}: ${errText}`);
+  }
+  const data = await res.json();
+  return data.files || [];
+};
+
+/**
+ * Finds a folder under parentId that matches a name-based query, or creates it if not found.
+ * This is highly robust as it filters on Google Drive server-side to avoid pagination issues.
+ */
+export const findOrCreateFolderWithQueryMatch = async (
+  accessToken: string,
+  parentId: string,
+  searchTerm: string,
+  matchFn: (name: string) => boolean,
+  defaultName: string
+): Promise<string> => {
+  const query = `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name contains '${searchTerm.replace(/'/g, "\\'")}' and trashed = false`;
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=files(id,name)`;
+  
+  let foundId: string | null = null;
+  try {
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const files = data.files || [];
+      const found = files.find((f: { name: string }) => matchFn(f.name));
+      if (found) {
+        console.log(`[Query Match] Found existing folder matching "${searchTerm}": ID=${found.id}, Name="${found.name}" under parent=${parentId}`);
+        foundId = found.id;
+      }
+    } else {
+      const errText = await res.text();
+      console.warn(`Query match search failed for "${searchTerm}" under ${parentId}: ${errText}`);
+    }
+  } catch (err) {
+    console.warn(`Error during query match search for "${searchTerm}":`, err);
+  }
+  
+  if (foundId) {
+    return foundId;
+  }
+  
+  // Backup: fetch broad list under parent as a fallback in case server-side 'contains' behaved unexpectedly
+  try {
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=files(id,name)&pageSize=100`;
+    const listRes = await fetch(listUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      const files = listData.files || [];
+      const found = files.find((f: { name: string }) => matchFn(f.name));
+      if (found) {
+        console.log(`[Backup List Match] Found folder matching in full list: ID=${found.id}, Name="${found.name}"`);
+        return found.id;
+      }
+    }
+  } catch (err) {
+    console.warn(`Backup list check failed:`, err);
+  }
+  
+  // Create it
+  console.log(`Creating new folder "${defaultName}" under parent ${parentId}`);
+  const createPayload = {
+    name: defaultName,
+    mimeType: 'application/vnd.google-apps.folder',
+    parents: [parentId]
+  };
+  
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(createPayload)
+  });
+  
+  if (!createRes.ok) {
+    const errText = await createRes.text();
+    throw new Error(`Failed to create folder '${defaultName}' under parent '${parentId}': ${errText}`);
+  }
+  
+  const data = await createRes.json();
+  return data.id;
+};
+
+/**
+ * Syncs all base64 photos of a record to Google Drive.
+ * Creates the folder structure in Drive:
+ * Shared Master (133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-) -> {oaNo4Digit} -> {oaNo4Digit} - Site Supervisor Folder -> Site_Installation_Photos
+ */
+export const syncPhotosToDrive = async (
+  accessToken: string,
+  oaNoFull: string,
+  photos: { [stageKey: string]: { id: string; name: string; url: string; date: string; isCamera: boolean }[] }
+): Promise<{ [stageKey: string]: { id: string; name: string; url: string; date: string; isCamera: boolean }[] }> => {
+  const numericParts = oaNoFull.replace(/\D/g, '');
+  const oaNo4Digit = numericParts.substring(0, 4) || '3870';
+  
+  const masterFolderId = '133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-';
+  
+  console.log(`Starting Google Drive photo sync for SO ${oaNo4Digit} under Master Folder ${masterFolderId}...`);
+  
+  // 1. Find or create the SO folder (e.g. 4099) under the Shared Master Folder
+  const soFolderId = await findOrCreateFolderWithQueryMatch(
+    accessToken,
+    masterFolderId,
+    oaNo4Digit,
+    (name) => {
+      const cleanName = name.replace(/\s+/g, '');
+      return cleanName.startsWith(oaNo4Digit) || cleanName.includes(oaNo4Digit);
+    },
+    oaNo4Digit
+  );
+  
+  // 2. Find or create the Supervisor folder (e.g. 4099 - Site Supervisor Folder) under the SO folder
+  const supervisorFolderId = await findOrCreateFolderWithQueryMatch(
+    accessToken,
+    soFolderId,
+    'Supervisor',
+    (name) => {
+      const lower = name.toLowerCase();
+      return lower.includes('supervisor') || lower.includes('site supervisor');
+    },
+    `${oaNo4Digit} - Site Supervisor Folder`
+  );
+  
+  // 3. Find or create the Site_Installation_Photos folder under the Supervisor folder
+  const photosFolderId = await findOrCreateFolderWithQueryMatch(
+    accessToken,
+    supervisorFolderId,
+    'Photos',
+    (name) => {
+      const lower = name.toLowerCase();
+      return lower.includes('photo') || lower.includes('installation_photos') || lower.includes('installation photos');
+    },
+    'Site_Installation_Photos'
+  );
+  
+  const updatedPhotos: { [stageKey: string]: any[] } = {};
+  
+  for (const stageKey of Object.keys(photos)) {
+    const stagePhotosList = photos[stageKey] || [];
+    const uploadedList = [];
+    
+    for (const photo of stagePhotosList) {
+      if (photo.url.startsWith('data:')) {
+        try {
+          const uploadedFile = await uploadImageToDrive(accessToken, photo.url, photo.name, photosFolderId);
+          uploadedList.push({
+            ...photo,
+            url: uploadedFile.url,
+            driveFileId: uploadedFile.id
+          });
+        } catch (err) {
+          console.error(`Failed to sync ${photo.name}:`, err);
+          uploadedList.push(photo);
+        }
+      } else {
+        uploadedList.push(photo);
+      }
+    }
+    
+    updatedPhotos[stageKey] = uploadedList;
+  }
+  
+  return updatedPhotos;
+};

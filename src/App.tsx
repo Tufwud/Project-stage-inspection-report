@@ -61,6 +61,53 @@ export default function App() {
     };
   });
 
+  // Manage list of supervisors dynamically, persisting in localStorage
+  const [supervisors, setSupervisors] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("door_quality_compliance_dashboard_supervisors");
+      if (saved) {
+        // Filter out Nagesh Yadav/Jadav to fulfill the user's specific removal request
+        const list: string[] = JSON.parse(saved);
+        return list.filter(s => s !== "Nagesh Yadav" && s !== "Nagesh Jadav");
+      }
+    } catch (e) {}
+    return [
+      "Aarif Taslim",
+      "Vivek Laxman",
+      "Sandip Vishwakarma",
+      "Surya Pratap Singh",
+      "Radheshyam",
+      "Rahul Sharma",
+      "Ramanpreet Singh",
+      "Arunava Samadder",
+      "Niranjan Das",
+      "Indraj Meghwal"
+    ];
+  });
+
+  const handleAddSupervisor = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSupervisors(prev => {
+      if (prev.includes(trimmed)) return prev;
+      const updated = [...prev, trimmed];
+      try {
+        localStorage.setItem("door_quality_compliance_dashboard_supervisors", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleRemoveSupervisor = (name: string) => {
+    setSupervisors(prev => {
+      const updated = prev.filter(s => s !== name);
+      try {
+        localStorage.setItem("door_quality_compliance_dashboard_supervisors", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
   // Grid filters
   const [selectedTower, setSelectedTower] = useState<string | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
@@ -326,6 +373,13 @@ export default function App() {
       setSelectedTower(null);
       setSelectedFloor(null);
     }
+  };
+
+  const handleClearAllHistory = () => {
+    setSavedProjects([]);
+    try {
+      localStorage.setItem("door_quality_compliance_dashboard_history", JSON.stringify([]));
+    } catch (e) {}
   };
 
   // Load from local storage on mount
@@ -644,6 +698,10 @@ export default function App() {
               savedProjects={savedProjects}
               onLoadProject={handleLoadProjectFromHistory}
               onDeleteProject={handleDeleteProjectFromHistory}
+              onClearHistory={handleClearAllHistory}
+              supervisors={supervisors}
+              onAddSupervisor={handleAddSupervisor}
+              onRemoveSupervisor={handleRemoveSupervisor}
             />
           </div>
         ) : activeTab === 'sheets' ? (
@@ -683,6 +741,7 @@ export default function App() {
             }}
             onSave={handleSaveFlat}
             onDelete={handleDeleteFlat}
+            supervisors={supervisors}
           />
         )}
       </AnimatePresence>

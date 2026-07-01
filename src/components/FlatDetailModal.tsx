@@ -12,6 +12,7 @@ import {
 } from '../utils';
 import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download, Hammer, Camera, Image, FileText, Paperclip } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getAccessToken, googleSignIn, syncPhotosToDrive } from '../lib/googleSheets';
 
 // Helper to get local timestamp in YYYY-MM-DDTHH:mm format
 const getLocalTimestamp = () => {
@@ -30,13 +31,48 @@ interface FlatDetailModalProps {
   onClose: () => void;
   onSave: (updated: FlatRecord) => void;
   onDelete?: (id: string) => void;
+  supervisors?: string[];
 }
 
-export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelete }: FlatDetailModalProps) {
+export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelete, supervisors }: FlatDetailModalProps) {
+  const supervisorList = supervisors || SUPERVISORS.filter(s => s !== "Nagesh Yadav" && s !== "Nagesh Jadav");
   const [formData, setFormData] = useState<FlatRecord | null>(null);
   const [activeTab, setActiveTab] = useState<MilestoneKey>('frameFixing');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [zoomedPhoto, setZoomedPhoto] = useState<{ url: string; name: string } | null>(null);
+
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const token = await getAccessToken();
+        setGoogleToken(token);
+      } catch (err) {
+        console.warn("Failed to get Google Token:", err);
+      }
+    };
+    if (isOpen) {
+      fetchToken();
+    }
+  }, [isOpen]);
+
+  const handleConnectGoogle = async () => {
+    try {
+      setSyncError(null);
+      setIsSyncing(true);
+      const res = await googleSignIn();
+      if (res?.accessToken) {
+        setGoogleToken(res.accessToken);
+      }
+    } catch (err: any) {
+      setSyncError(err?.message || "Failed to authenticate with Google");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // ERP PDF Upload logic
   const handleErpPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -434,9 +470,48 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
     return Math.max(0, score);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData) {
+    if (!formData) return;
+
+    if (googleToken) {
+      setIsSyncing(true);
+      setSyncError(null);
+      try {
+        const photosToSync = formData.photos || {};
+        let hasBase64 = false;
+        for (const key of Object.keys(photosToSync)) {
+          if (photosToSync[key]?.some(p => p.url.startsWith('data:'))) {
+            hasBase64 = true;
+            break;
+          }
+        }
+
+        if (hasBase64) {
+          const syncedPhotos = await syncPhotosToDrive(googleToken, formData.oaNo || '387026', photosToSync);
+          const updatedFormData = {
+            ...formData,
+            photos: syncedPhotos
+          };
+          onSave(updatedFormData);
+        } else {
+          onSave(formData);
+        }
+        onClose();
+      } catch (err: any) {
+        console.error("Failed to sync photos during save:", err);
+        const errMsg = err.message || err;
+        setSyncError(`Photo sync failed: ${errMsg}. Saved changes locally offline.`);
+        
+        // Automatically proceed with offline save so that user data is never lost due to network errors
+        setTimeout(() => {
+          onSave(formData);
+          onClose();
+        }, 3000);
+      } finally {
+        setIsSyncing(false);
+      }
+    } else {
       onSave(formData);
       onClose();
     }
@@ -463,6 +538,17 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
         transition={{ type: "spring", damping: 25, stiffness: 220 }}
         className="relative w-full max-w-xl bg-white h-screen flex flex-col shadow-2xl z-10"
       >
+        {isSyncing && (
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-xs z-50 flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+            <h3 className="text-base font-extrabold text-zinc-950 font-sans tracking-tight">Active Syncing in Progress</h3>
+            <p className="text-xs text-zinc-650 max-w-xs mt-1 leading-relaxed">
+              Auto-creating folders for SO <strong className="text-zinc-900 font-mono">#{oaNo4Digit}</strong> and uploading installation photographs directly to your Google Drive directory.
+            </p>
+            <p className="text-[10px] text-zinc-400 font-mono mt-4">Please do not close this window...</p>
+          </div>
+        )}
+
         <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-zinc-400 font-mono tracking-wider font-bold text-[10px] uppercase">
@@ -754,7 +840,6 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                     const getMetricLabel = (chc: any) => {
                       if (chc.key === 'not_started') return '0%';
                       if (chc.key === 'not_approved') return '0%';
-                      if (chc.key === 'completed') return '50%';
                       if (chc.key === 'rework_needed') return '50%';
                       if (chc.key === 'repair_reqd') return '60%';
                       if (chc.key === 'approved_remarks') return '80%';
@@ -820,7 +905,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                     className="w-full mt-1 px-3 py-1.5 border border-zinc-200 rounded-xl text-xs focus:outline-none focus:border-zinc-500 bg-white font-medium"
                   >
                     <option value="">-- Unassigned --</option>
-                    {SUPERVISORS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {supervisorList.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
 
@@ -1008,11 +1093,40 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                     <span className="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider font-mono">
                       Google Drive Sync Target
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono shrink-0">
-                      <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse animate-duration-1000" />
-                      Active Sync
-                    </span>
+                    {googleToken ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Active Sync: Connected
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold bg-amber-55 text-amber-850 border border-amber-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        Offline / Local State
+                      </span>
+                    )}
                   </div>
+
+                  {!googleToken && (
+                    <div className="bg-amber-50/50 border border-amber-200/50 rounded-lg p-2.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <p className="text-[10px] text-amber-850 font-medium leading-relaxed">
+                        Connect Google Drive to auto-create folder hierarchies & upload installation photos on save.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleConnectGoogle}
+                        disabled={isSyncing}
+                        className="w-full sm:w-auto px-2.5 py-1.5 bg-amber-600 hover:bg-amber-750 text-white rounded-lg text-[10px] font-extrabold transition shrink-0 shadow-3xs cursor-pointer whitespace-nowrap disabled:opacity-50"
+                      >
+                        {isSyncing ? "Connecting..." : "🔗 Connect Google"}
+                      </button>
+                    </div>
+                  )}
+
+                  {syncError && (
+                    <p className="text-[9.5px] text-rose-600 font-bold font-mono bg-rose-50 border border-rose-100 p-2 rounded-lg">
+                      ⚠️ {syncError}
+                    </p>
+                  )}
 
                   {/* Directory Tree */}
                   <div className="font-mono text-[10px] text-zinc-600 bg-white border border-zinc-200 rounded-lg p-3 space-y-1">
@@ -1090,7 +1204,8 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center justify-center px-5 py-2.5 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-500 bg-white hover:bg-zinc-50 transition-colors cursor-pointer min-h-[44px] sm:min-h-[38px]"
+                disabled={isSyncing}
+                className="inline-flex items-center justify-center px-5 py-2.5 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-500 bg-white hover:bg-zinc-50 disabled:opacity-50 transition-colors cursor-pointer min-h-[44px] sm:min-h-[38px]"
               >
                 Cancel
               </button>
@@ -1098,10 +1213,20 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm sm:text-xs font-extrabold shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/25 active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer min-h-[48px] sm:min-h-[38px] text-center"
+                disabled={isSyncing}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-sm sm:text-xs font-extrabold shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/25 active:scale-[0.98] transition-all whitespace-nowrap cursor-pointer min-h-[48px] sm:min-h-[38px] text-center"
               >
-                <Save className="w-4.5 h-4.5 sm:w-4 sm:h-4" />
-                <span>Save Record</span>
+                {isSyncing ? (
+                  <>
+                    <Clock className="w-4 h-4 animate-spin text-white" />
+                    <span>Syncing & Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4.5 h-4.5 sm:w-4 sm:h-4" />
+                    <span>Save Record</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
