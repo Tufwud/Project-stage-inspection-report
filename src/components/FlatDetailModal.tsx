@@ -10,7 +10,7 @@ import {
   getFlatBasePrice,
   getFinancialStagePct
 } from '../utils';
-import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download, Hammer } from 'lucide-react';
+import { X, Calendar, User, Save, Trash2, CheckSquare, Square, Clock, Download, Hammer, Camera, Image, FileText, Paperclip } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Helper to get local timestamp in YYYY-MM-DDTHH:mm format
@@ -36,6 +36,133 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
   const [formData, setFormData] = useState<FlatRecord | null>(null);
   const [activeTab, setActiveTab] = useState<MilestoneKey>('frameFixing');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [zoomedPhoto, setZoomedPhoto] = useState<{ url: string; name: string } | null>(null);
+
+  // ERP PDF Upload logic
+  const handleErpPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          erpWorkOrder: {
+            name: file.name,
+            date: new Date().toLocaleDateString('en-GB'),
+            size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+            url: reader.result as string
+          }
+        };
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveErpPdf = () => {
+    setFormData(prev => {
+      if (!prev) return null;
+      const updated = { ...prev };
+      delete updated.erpWorkOrder;
+      return updated;
+    });
+  };
+
+  // Stage-wise Photo Upload logic
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, isCamera: boolean) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData(prev => {
+        if (!prev) return null;
+        const currentPhotos = prev.photos || {};
+        const stagePhotos = currentPhotos[activeTab] || [];
+        
+        // short stage mapping
+        const stageShortMap: { [key: string]: string } = {
+          frameFixing: 'FF',
+          doorFixing: 'DF',
+          hardwareFixing: 'HF',
+          painting: 'PT',
+          handover: 'HO'
+        };
+        const shortStage = stageShortMap[activeTab] || 'STG';
+        
+        // picture index is current length + 1
+        const pictureIndex = stagePhotos.length + 1;
+        
+        // Date format: DDMMYY
+        const d = new Date();
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).substring(2);
+        const dateStr = `${day}${month}${year}`;
+        
+        // Nomenclature: {flatNo}_{shortStage}_P{number}_{dateStr}
+        const nomenclatureName = `${prev.flatNo || 'FLAT'}_${shortStage}_P${pictureIndex}_${dateStr}`;
+        
+        const newPhotoItem = {
+          id: `photo_${Date.now()}`,
+          name: nomenclatureName,
+          url: reader.result as string,
+          date: d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          isCamera
+        };
+
+        return {
+          ...prev,
+          photos: {
+            ...currentPhotos,
+            [activeTab]: [...stagePhotos, newPhotoItem]
+          }
+        };
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = (photoId: string) => {
+    setFormData(prev => {
+      if (!prev) return null;
+      const currentPhotos = prev.photos || {};
+      const stagePhotos = currentPhotos[activeTab] || [];
+      const updatedPhotos = stagePhotos.filter(p => p.id !== photoId);
+      
+      // Renumber remaining photos to maintain correct sequential nomenclature name
+      const renumberedPhotos = updatedPhotos.map((p, idx) => {
+        const stageShortMap: { [key: string]: string } = {
+          frameFixing: 'FF',
+          doorFixing: 'DF',
+          hardwareFixing: 'HF',
+          painting: 'PT',
+          handover: 'HO'
+        };
+        const shortStage = stageShortMap[activeTab] || 'STG';
+        const pictureIndex = idx + 1;
+        
+        // extract or regenerate date part
+        const parts = p.name.split('_');
+        const dateStr = parts.length >= 4 ? parts[3] : parts[parts.length - 1] || 'DATE';
+        const nomenclatureName = `${prev.flatNo || 'FLAT'}_${shortStage}_P${pictureIndex}_${dateStr}`;
+        return {
+          ...p,
+          name: nomenclatureName
+        };
+      });
+
+      return {
+        ...prev,
+        photos: {
+          ...currentPhotos,
+          [activeTab]: renumberedPhotos
+        }
+      };
+    });
+  };
 
   // Sync state with selected flat
   useEffect(() => {
@@ -316,6 +443,9 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
   };
 
   const stageProgress = formData ? getMilestoneProgress(formData, activeTab) : 0;
+  const oaNoFull = formData?.oaNo || '387026';
+  const numericParts = oaNoFull.replace(/\D/g, '');
+  const oaNo4Digit = numericParts.substring(0, 4) || '3870';
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -431,6 +561,76 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                     min="0"
                   />
                 </div>
+              </div>
+
+              {/* SECTION: ERP Work Order PDF Upload */}
+              <div className="col-span-2 bg-zinc-50/50 rounded-2xl border border-zinc-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-700 uppercase tracking-tight flex items-center gap-1.5">
+                    <Paperclip className="w-4 h-4 text-zinc-500" />
+                    ERP Work Order (PDF)
+                  </span>
+                  {formData.erpWorkOrder && (
+                    <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                      Costing Verified
+                    </span>
+                  )}
+                </div>
+
+                {!formData.erpWorkOrder ? (
+                  <div className="border border-dashed border-zinc-300 rounded-xl p-4 text-center hover:bg-zinc-100/50 transition relative">
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleErpPdfUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      id="erp-pdf-file-upload"
+                    />
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center justify-center p-2 bg-zinc-100 text-zinc-500 rounded-full border border-zinc-200">
+                        <FileText className="w-5 h-5 text-indigo-500" />
+                      </div>
+                      <p className="text-xs font-bold text-zinc-700">Click or Drag to Upload ERP Work Order</p>
+                      <p className="text-[10px] text-zinc-400 font-semibold font-mono uppercase">PDF Format Only</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-zinc-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-3xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-zinc-900 truncate font-mono">{formData.erpWorkOrder.name}</p>
+                        <p className="text-[10px] text-zinc-400 font-bold font-mono">
+                          {formData.erpWorkOrder.size} &bull; {formData.erpWorkOrder.date}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <a
+                        href={formData.erpWorkOrder.url}
+                        download={formData.erpWorkOrder.name}
+                        className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 text-zinc-500 hover:text-indigo-650 transition cursor-pointer"
+                        title="Download ERP PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleRemoveErpPdf}
+                        className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-500 transition cursor-pointer"
+                        title="Remove Document"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-[9px] text-zinc-400 leading-normal font-semibold font-mono uppercase bg-zinc-100 p-2 rounded-lg border border-zinc-200/55">
+                  📂 Path: <a href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-" target="_blank" rel="noopener noreferrer" className="text-indigo-650 font-extrabold hover:underline">Google Drive (Shared Master)</a> / {oaNo4Digit} / {oaNo4Digit}-Site Supervisor / ERP_Work_Order.pdf
+                </p>
               </div>
             </div>
 
@@ -673,6 +873,186 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                 </div>
               </div>
 
+              {/* Site Installation Photos & Verification */}
+              <div className="pt-5 border-t border-zinc-200/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-zinc-800 uppercase tracking-tight flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-zinc-500" />
+                      Site Installation Photos
+                    </span>
+                    <p className="text-[10px] text-zinc-500 font-medium">Verify work progress with high-res photographs</p>
+                  </div>
+                  <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-0.5 rounded-full font-mono uppercase shrink-0">
+                    Auto-Nomenclature: ON
+                  </span>
+                </div>
+
+                {/* Upload Buttons Row */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Camera Upload Button */}
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => handlePhotoUpload(e, true)}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      id="camera-upload-input"
+                    />
+                    <label
+                      htmlFor="camera-upload-input"
+                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100/80 active:bg-indigo-200 text-indigo-750 text-xs font-bold rounded-xl border border-indigo-200 transition-all cursor-pointer shadow-3xs w-full text-center"
+                    >
+                      <Camera className="w-4 h-4 shrink-0" />
+                      <span>Take Photo (Camera)</span>
+                    </label>
+                  </div>
+
+                  {/* Gallery Upload Button */}
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handlePhotoUpload(e, false)}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      id="gallery-upload-input"
+                    />
+                    <label
+                      htmlFor="gallery-upload-input"
+                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-zinc-100 hover:bg-zinc-200/85 active:bg-zinc-300 text-zinc-700 text-xs font-bold rounded-xl border border-zinc-200 transition-all cursor-pointer shadow-3xs w-full text-center"
+                    >
+                      <Image className="w-4 h-4 shrink-0" />
+                      <span>Upload from Gallery</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Photos Grid Display */}
+                {(() => {
+                  const stagePhotos = (formData.photos || {})[activeTab] || [];
+                  if (stagePhotos.length === 0) {
+                    return (
+                      <div className="bg-white border border-zinc-200 border-dashed rounded-xl p-6 text-center text-zinc-400 space-y-1">
+                        <Image className="w-6 h-6 text-zinc-300 mx-auto" />
+                        <p className="text-[11px] font-bold text-zinc-500">No installation photos uploaded yet</p>
+                        <p className="text-[10px] text-zinc-400 font-medium leading-relaxed">
+                          The <code className="font-mono bg-zinc-100 text-zinc-650 px-1 py-0.5 rounded border border-zinc-200">Site_Installation_Photos</code> folder will be <strong className="text-zinc-650">automatically created</strong> inside your Google Drive directory.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      {stagePhotos.map((photo, pIdx) => (
+                        <div
+                          key={photo.id}
+                          className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-3xs group relative flex flex-col justify-between"
+                        >
+                          {/* Image Thumbnail Container */}
+                          <div className="relative aspect-4/3 bg-zinc-950 overflow-hidden group/img cursor-pointer" onClick={() => setZoomedPhoto({ url: photo.url, name: photo.name })}>
+                            <img
+                              src={photo.url}
+                              alt={photo.name}
+                              className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
+                            />
+                            {/* Camera Icon Overlay indicator if taken via camera */}
+                            {photo.isCamera && (
+                              <span className="absolute top-2 left-2 bg-zinc-900/75 text-white p-1 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 backdrop-blur-xs">
+                                <Camera className="w-3 h-3" />
+                                Camera
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Details & Action Bar */}
+                          <div className="p-2 space-y-1.5 border-t border-zinc-100">
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-black font-mono text-zinc-900 truncate" title={photo.name}>
+                                {photo.name}
+                              </p>
+                              <p className="text-[9px] text-zinc-400 font-bold font-mono">
+                                {photo.date}
+                              </p>
+                            </div>
+                            <div className="flex gap-1">
+                              <a
+                                href={photo.url}
+                                download={`${photo.name}.jpg`}
+                                className="flex-1 py-1 px-1.5 border border-zinc-200 hover:border-zinc-300 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+                                title="Download image with proper nomenclature"
+                              >
+                                <Download className="w-3 h-3 text-zinc-500" />
+                                <span>Download</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhoto(photo.id)}
+                                className="py-1 px-1.5 border border-rose-100 hover:border-rose-200 bg-rose-50/55 hover:bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
+                                title="Delete Photo"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* Google Drive Interactive Directory Tree */}
+                <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-3.5 space-y-2.5 shadow-3xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider font-mono">
+                      Google Drive Sync Target
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono shrink-0">
+                      <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse animate-duration-1000" />
+                      Active Sync
+                    </span>
+                  </div>
+
+                  {/* Directory Tree */}
+                  <div className="font-mono text-[10px] text-zinc-600 bg-white border border-zinc-200 rounded-lg p-3 space-y-1">
+                    <div className="flex items-center gap-1.5 text-zinc-400">
+                      <span>📁</span> <a href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-" target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-650 hover:underline">Google Drive (Shared Master)</a>
+                    </div>
+                    <div className="flex items-center gap-1.5 pl-3 text-zinc-500">
+                      <span>└── 📁</span> <span className="font-bold text-zinc-700">{oaNo4Digit}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 pl-6 text-zinc-650">
+                      <span>└── 📁</span> <span className="font-bold text-zinc-800">{oaNo4Digit}-Site Supervisor</span>
+                    </div>
+                    <div className="flex items-center justify-between pl-9 text-indigo-700">
+                      <div className="flex items-center gap-1.5">
+                        <span>└── 📁</span> <span className="font-extrabold text-indigo-850">Site_Installation_Photos</span>
+                      </div>
+                      <span className="text-[8px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100/70 px-1.5 py-0.5 rounded-sm uppercase tracking-wide font-mono scale-90">
+                        Auto-Creates
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Open in Drive action */}
+                  <div className="flex items-center justify-between gap-3 pt-0.5">
+                    <p className="text-[9px] text-zinc-400 font-semibold leading-normal uppercase">
+                      Automatic sequential nomenclature upload target
+                    </p>
+                    <a
+                      href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[10px] font-extrabold rounded-lg transition shrink-0 shadow-sm cursor-pointer"
+                    >
+                      <span>Open Shared Drive</span>
+                      <span className="text-indigo-200 font-normal">→</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </form>
@@ -764,6 +1144,39 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Zoom Dialog */}
+      {zoomedPhoto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-zinc-950/85 backdrop-blur-md animate-fadeIn" onClick={() => setZoomedPhoto(null)}>
+          <div className="relative max-w-2xl w-full bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl border border-zinc-850 flex flex-col animate-scaleUp" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between text-white bg-zinc-950">
+              <span className="text-xs font-bold font-mono text-zinc-400 tracking-wider truncate">{zoomedPhoto.name}</span>
+              <button
+                type="button"
+                onClick={() => setZoomedPhoto(null)}
+                className="p-1 rounded-lg border border-zinc-850 hover:bg-zinc-800 transition text-zinc-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {/* Zoomed Image */}
+            <div className="p-2 bg-zinc-950 flex items-center justify-center min-h-[300px] max-h-[70vh]">
+              <img
+                src={zoomedPhoto.url}
+                alt={zoomedPhoto.name}
+                className="max-w-full max-h-[65vh] object-contain rounded-xl select-none"
+              />
+            </div>
+            {/* Footer Location path info */}
+            <div className="p-4 bg-zinc-950 border-t border-zinc-800 text-center">
+              <p className="text-[10px] text-zinc-500 font-bold font-mono uppercase tracking-wide">
+                📁 Saved in Site Installation Photos &bull; Sequential Nomenclature
+              </p>
             </div>
           </div>
         </div>

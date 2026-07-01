@@ -156,6 +156,7 @@ export interface FlatRecord {
   supervisor?: string;
   contractor?: string;
   photos?: { [stageKey: string]: { id: string; name: string; url: string; date: string; isCamera: boolean }[] };
+  erpWorkOrder?: { name: string; date: string; url: string; size: string };
 }
 
 export type MilestoneKey = 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'painting' | 'handover';
