@@ -297,6 +297,34 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
     });
   };
 
+  // Bulk update all checkpoints across all stages (milestones) to approved at once
+  const handleAllStagesBulkApproved = () => {
+    setFormData(prev => {
+      if (!prev) return null;
+      const updated = { ...prev };
+      
+      MILESTONES.forEach(meta => {
+        const milestoneKey = meta.key;
+        const currentMilestone = { ...(updated[milestoneKey] || {}) } as any;
+        
+        Object.keys(meta.subtaskLabels).forEach(taskKey => {
+          currentMilestone[taskKey] = 'approved';
+        });
+        
+        if (!currentMilestone.doneBy) {
+          currentMilestone.doneBy = supervisorList[0] || SUPERVISORS[0];
+        }
+        if (!currentMilestone.timestamp) {
+          currentMilestone.timestamp = getLocalTimestamp();
+        }
+        
+        updated[milestoneKey] = currentMilestone;
+      });
+      
+      return updated;
+    });
+  };
+
   const handleWorkerChange = (milestoneKey: MilestoneKey, value: string) => {
     setFormData(prev => {
       if (!prev) return null;
@@ -783,9 +811,20 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
 
           {/* Section 2: Interactive Milestone Quality Toggles */}
           <div className="space-y-4 pt-4 border-t border-zinc-100">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Quality Checkpoint Stages</h3>
-              <span className="text-xs font-semibold text-zinc-500 font-mono">Stage: {stageProgress}% Completed</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-50 border border-zinc-200 p-4 rounded-2xl">
+              <div>
+                <h3 className="text-xs font-extrabold text-zinc-500 uppercase tracking-wider">Quality Checkpoint Stages</h3>
+                <span className="text-xs font-semibold text-zinc-700 font-mono">Current Tab Progress: {stageProgress}% Completed</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAllStagesBulkApproved}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-650 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[10.5px] font-extrabold rounded-xl transition shadow-3xs cursor-pointer select-none tracking-wider uppercase shrink-0"
+                title="Instantly set every checklist item across all 5 quality stages to 100% Approved"
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>All Stages Approved (100%)</span>
+              </button>
             </div>
 
             {/* Stage Selector tabs */}
@@ -820,21 +859,32 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-200/50">
                   <span className="text-xs font-bold text-zinc-800 uppercase tracking-tight">Requirement Toggles</span>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
                       onClick={() => handleStageBulkUpdate(activeTab, true)}
-                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase"
+                      className="text-[10px] font-bold text-indigo-650 hover:text-indigo-800 uppercase"
+                      title="Approve all items in current tab only"
                     >
-                      Fill All Approved
+                      Fill Active Approved
+                    </button>
+                    <span className="text-zinc-300">|</span>
+                    <button
+                      type="button"
+                      onClick={handleAllStagesBulkApproved}
+                      className="text-[10px] font-extrabold text-emerald-650 hover:text-emerald-800 uppercase bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+                      title="Approve all items in ALL stages at once"
+                    >
+                      FILL ALL APPROVED (ALL STAGES)
                     </button>
                     <span className="text-zinc-300">|</span>
                     <button
                       type="button"
                       onClick={() => handleStageBulkUpdate(activeTab, false)}
                       className="text-[10px] font-bold text-zinc-500 hover:text-zinc-800 uppercase"
+                      title="Clear items in current tab"
                     >
-                      Clear All
+                      Clear Active
                     </button>
                   </div>
                 </div>

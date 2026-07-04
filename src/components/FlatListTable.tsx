@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FlatRecord } from '../types';
 import { getFlatOverallProgress, getMilestoneProgress } from '../utils';
 import { SUPERVISORS, DOOR_TYPES, TOWERS_LIST } from '../data/mockData';
-import { Search, Filter, Plus, ChevronRight, Hash, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Search, Filter, Plus, ChevronRight, Hash, ArrowUpDown, ChevronDown, Check, CheckSquare } from 'lucide-react';
 
 interface FlatListTableProps {
   flats: FlatRecord[];
@@ -12,6 +12,7 @@ interface FlatListTableProps {
   selectedFloor: number | null;
   selectedMilestoneFilter: string | null;
   onClearGridFilters: () => void;
+  onBulkApproveFlat?: (flatId: string) => void;
 }
 
 type SortField = 'id' | 'flatNo' | 'floor' | 'progress';
@@ -24,7 +25,8 @@ export default function FlatListTable({
   selectedTower,
   selectedFloor,
   selectedMilestoneFilter,
-  onClearGridFilters
+  onClearGridFilters,
+  onBulkApproveFlat
 }: FlatListTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewFinderQuery, setViewFinderQuery] = useState('');
@@ -341,6 +343,7 @@ export default function FlatListTable({
                 </div>
               </th>
               
+              <th className="p-4 text-center font-bold text-zinc-500 uppercase tracking-wide">Quick Action</th>
               <th className="p-4"></th>
             </tr>
           </thead>
@@ -479,6 +482,26 @@ export default function FlatListTable({
                           ></div>
                         </div>
                       </div>
+                    </td>
+
+                    {/* Quick Bulk Action column */}
+                    <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                      {overallPct === 100 ? (
+                        <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>100% APPROVED</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onBulkApproveFlat?.(flat.id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-650 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[10.5px] font-extrabold rounded-xl transition shadow-3xs cursor-pointer select-none uppercase tracking-wide"
+                          title="Instantly set every checklist item across all stages to Approved (100%)"
+                        >
+                          <CheckSquare className="w-3.5 h-3.5" />
+                          <span>Approve All Stages</span>
+                        </button>
+                      )}
                     </td>
 
                     {/* Launch editor trigger */}

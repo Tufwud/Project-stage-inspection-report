@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FlatRecord, SavedProject } from '../types';
 import { SUPERVISORS, DOOR_TYPES, DOOR_MAP } from '../data/mockData';
 import { getProjectAnalysis } from '../utils';
+import { getAccessToken, googleSignIn, syncErpPdfToDrive } from '../lib/googleSheets';
 import { 
   Settings, 
   Plus, 
@@ -22,7 +23,10 @@ import {
   History,
   FolderOpen,
   Users,
-  BookOpen
+  BookOpen,
+  Paperclip,
+  FileText,
+  Download
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -101,8 +105,8 @@ export default function BackgroundValuesTab({
     "Toilet 1 (T1)"
   ]);
 
-  // Configuration Sub Tab ('openings' | 'payment' | 'contractors' | 'supervisors')
-  const [configSubTab, setConfigSubTab] = useState<'openings' | 'payment' | 'contractors' | 'supervisors'>('openings');
+  // Configuration Sub Tab ('openings' | 'payment' | 'contractors' | 'supervisors' | 'erp_upload')
+  const [configSubTab, setConfigSubTab] = useState<'openings' | 'payment' | 'contractors' | 'supervisors' | 'erp_upload'>('openings');
 
   // Pricing structure local edit values
   const [editingPrices, setEditingPrices] = useState<{ [code: string]: string }>(() => {
@@ -141,6 +145,25 @@ export default function BackgroundValuesTab({
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [priceSuccessBanner, setPriceSuccessBanner] = useState<string | null>(null);
+
+  // --- ERP Work Order PDF State ---
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
+  const [isUploadingErp, setIsUploadingErp] = useState(false);
+  const [erpUploadError, setErpUploadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const token = await getAccessToken();
+        setGoogleToken(token);
+      } catch (err) {
+        console.warn("Failed to get Google Token:", err);
+      }
+    };
+    if (configSubTab === 'erp_upload') {
+      fetchToken();
+    }
+  }, [configSubTab]);
 
   // Confirmation modally triggered states
   const [towerToWipe, setTowerToWipe] = useState<string | null>(null);
@@ -343,6 +366,96 @@ export default function BackgroundValuesTab({
     setTimeout(() => {
       setPriceSuccessBanner(null);
     }, 4000);
+  };
+
+  const activeOaNo = flats.length > 0 ? flats[0].oaNo : '387026';
+  const activeErp = flats.find(f => f.erpWorkOrder)?.erpWorkOrder;
+  const numericParts = activeOaNo.replace(/\D/g, '');
+  const oaNo4Digit = numericParts.substring(0, 4) || '3870';
+
+  const handleConnectGoogle = async () => {
+    try {
+      setErpUploadError(null);
+      setIsUploadingErp(true);
+      const res = await googleSignIn();
+      if (res?.accessToken) {
+        setGoogleToken(res.accessToken);
+      }
+    } catch (err: any) {
+      setErpUploadError(err?.message || "Failed to authenticate with Google");
+    } finally {
+      setIsUploadingErp(false);
+    }
+  };
+
+  const handleErpPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (flats.length === 0) {
+      setErpUploadError("No active checklists found! Initialize a project map first before uploading an ERP Work Order.");
+      return;
+    }
+
+    setErpUploadError(null);
+    setIsUploadingErp(true);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const localErp = {
+          name: file.name,
+          date: new Date().toLocaleDateString('en-GB'),
+          size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          url: reader.result as string
+        };
+
+        let finalErp = localErp;
+
+        if (googleToken) {
+          try {
+            // Upload directly to Google Drive Site Supervisor Folder
+            finalErp = await syncErpPdfToDrive(googleToken, activeOaNo, localErp);
+          } catch (driveErr: any) {
+            console.error("Failed to sync to Google Drive:", driveErr);
+            // Non-blocking, fallback to local state
+            setErpUploadError("Note: Saved in local state, but failed to sync directly to Google Drive. Keep Google authenticated and try again.");
+          }
+        }
+
+        // Save this erpWorkOrder to ALL active flats
+        if (onUpdateFlats) {
+          const updated = flats.map(flat => ({
+            ...flat,
+            erpWorkOrder: finalErp
+          }));
+          onUpdateFlats(updated);
+        }
+
+        setPriceSuccessBanner("ERP Work Order PDF successfully registered to all checklists in this project!");
+        setTimeout(() => setPriceSuccessBanner(null), 4000);
+      } catch (err: any) {
+        setErpUploadError(err?.message || "Failed to process PDF upload");
+      } finally {
+        setIsUploadingErp(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveErpPdf = () => {
+    if (window.confirm("Are you sure you want to remove the ERP Work Order PDF from all checklists in this project?")) {
+      if (onUpdateFlats) {
+        const updated = flats.map(flat => {
+          const u = { ...flat };
+          delete u.erpWorkOrder;
+          return u;
+        });
+        onUpdateFlats(updated);
+      }
+      setPriceSuccessBanner("ERP Work Order removed from all active checklists.");
+      setTimeout(() => setPriceSuccessBanner(null), 4500);
+    }
   };
 
   const handleSavePaymentPlan = (e: React.FormEvent) => {
@@ -924,6 +1037,17 @@ export default function BackgroundValuesTab({
               >
                 4. Manage Supervisors
               </button>
+              <button
+                type="button"
+                onClick={() => setConfigSubTab('erp_upload')}
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  configSubTab === 'erp_upload'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                5. ERP Work Order (PDF)
+              </button>
             </div>
           </div>
 
@@ -1332,6 +1456,134 @@ export default function BackgroundValuesTab({
                       ))
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {configSubTab === 'erp_upload' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-indigo-50/40 border border-indigo-200/60 rounded-xl p-4.5 space-y-3">
+                <div className="flex items-center gap-2 text-indigo-900">
+                  <Paperclip className="w-5 h-5 text-indigo-600" />
+                  <h4 className="font-extrabold text-sm tracking-tight">Project-Wide ERP Work Order (PDF)</h4>
+                </div>
+                <p className="text-xs text-zinc-650 leading-relaxed">
+                  Upload an ERP Work Order PDF for this active project. Saving a work order here will link it to <strong>all room checklist records</strong> across all towers in the project. It will be synced directly to the designated Google Drive Site Supervisor folder.
+                </p>
+              </div>
+
+              {erpUploadError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold rounded-xl flex items-center gap-2 font-mono">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  <span>{erpUploadError}</span>
+                </div>
+              )}
+
+              {/* Upload Interface */}
+              <div className="bg-zinc-50/50 rounded-2xl border border-zinc-200 p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-3">
+                  <span className="text-xs font-bold text-zinc-700 uppercase tracking-tight flex items-center gap-1.5 font-mono">
+                    Active SO: #{activeOaNo}
+                  </span>
+                  {googleToken ? (
+                    <span className="inline-flex items-center gap-1 text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Google Drive Sync Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[9px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      Local-Only Mode
+                    </span>
+                  )}
+                </div>
+
+                {!googleToken && (
+                  <div className="bg-amber-50/50 border border-amber-200/50 rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <p className="text-[10px] text-amber-850 font-semibold leading-relaxed">
+                      Connect to Google Drive to automatically organize folders and upload this document directly into the supervisor folder.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleConnectGoogle}
+                      disabled={isUploadingErp}
+                      className="w-full sm:w-auto px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-extrabold transition shrink-0 shadow-3xs cursor-pointer whitespace-nowrap disabled:opacity-50"
+                    >
+                      {isUploadingErp ? "Connecting..." : "🔗 Connect Google"}
+                    </button>
+                  </div>
+                )}
+
+                {/* Dropzone / Upload button */}
+                {!activeErp ? (
+                  <div className="border-2 border-dashed border-zinc-300 rounded-2xl p-8 text-center hover:bg-zinc-100/50 transition relative bg-white">
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleErpPdfUpload}
+                      disabled={isUploadingErp}
+                      className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                      id="erp-pdf-bulk-upload"
+                    />
+                    <div className="space-y-2">
+                      <div className="inline-flex items-center justify-center p-3 bg-zinc-100 text-zinc-500 rounded-full border border-zinc-200 shadow-3xs">
+                        <FileText className="w-6 h-6 text-indigo-500" />
+                      </div>
+                      <p className="text-sm font-bold text-zinc-800">
+                        {isUploadingErp ? "Processing & Uploading..." : "Click or Drag to Upload ERP Work Order"}
+                      </p>
+                      <p className="text-xs text-zinc-400 font-semibold font-mono uppercase">PDF Format Only</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-3xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 shrink-0">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-xs font-bold text-zinc-900 truncate font-mono">{activeErp.name}</p>
+                        <p className="text-[10px] text-zinc-400 font-bold font-mono">
+                          {activeErp.size} &bull; {activeErp.date}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5 sm:self-center">
+                      <a
+                        href={activeErp.url}
+                        download={activeErp.name}
+                        className="p-2 rounded-lg border border-zinc-200 hover:bg-zinc-50 text-zinc-650 hover:text-indigo-650 transition cursor-pointer shadow-3xs"
+                        title="Download ERP PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleRemoveErpPdf}
+                        className="p-2 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-500 transition cursor-pointer shadow-3xs"
+                        title="Remove Document"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Path display matching Supervisor Folder */}
+                <div className="bg-zinc-150/40 p-3 rounded-xl border border-zinc-200/50 space-y-1">
+                  <span className="block text-[9px] font-bold text-zinc-400 uppercase tracking-wider font-mono">Target Drive Path:</span>
+                  <p className="text-[10px] text-zinc-600 leading-normal font-mono">
+                    📂 {oaNo4Digit === '4027' ? (
+                      <>
+                        <a href="https://drive.google.com/drive/u/0/folders/1xcRODlPVO19nbHIlbF3tomz1ruSnaRFz" target="_blank" rel="noopener noreferrer" className="text-indigo-650 font-extrabold hover:underline">4027 - Site Supervisor Folder</a> / ERP_Work_Order.pdf
+                      </>
+                    ) : (
+                      <>
+                        <a href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-" target="_blank" rel="noopener noreferrer" className="text-indigo-650 font-extrabold hover:underline">Google Drive (Shared Master)</a> / {oaNo4Digit} / {oaNo4Digit} - Site Supervisor Folder / ERP_Work_Order.pdf
+                      </>
+                    )}
+                  </p>
                 </div>
               </div>
             </div>

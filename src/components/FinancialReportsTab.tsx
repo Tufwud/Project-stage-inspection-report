@@ -1194,13 +1194,21 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                         <div className="space-y-6">
                           {/* Certificate Heading Board */}
                           <div className="border-b-4 border-emerald-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-extrabold tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-emerald-200">
-                                TUFWUD DOOR COMPLIANCE PROTOCOL
-                              </span>
-                              <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
-                                DOOR-WISE QUALITY &amp; PAYMENT CERTIFICATE
-                              </h2>
+                            <div className="flex items-center gap-3.5">
+                              <img 
+                                src="/logo_transparent.svg" 
+                                alt="Tufwud Logo" 
+                                className="w-13 h-13 object-contain shrink-0" 
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-extrabold tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-emerald-200">
+                                  TUFWUD DOOR COMPLIANCE PROTOCOL
+                                </span>
+                                <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
+                                  DOOR-WISE QUALITY &amp; PAYMENT CERTIFICATE
+                                </h2>
+                              </div>
                             </div>
                             <div className="text-right font-mono text-xs text-zinc-550 space-y-0.5 font-bold shrink-0">
                               <div>Cert No: DC-{flats[0]?.oaNo || '387026'}-P{pageIdx + 1}</div>
@@ -1341,13 +1349,21 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 <div className="space-y-6">
                   {/* Certificate Heading Board */}
                   <div className="border-b-4 border-indigo-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
-                        SDTOWER PROJECT EXECUTIVE
-                      </span>
-                      <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
-                        TOWER-WISE INTERIM PAYMENT CERTIFICATE
-                      </h2>
+                    <div className="flex items-center gap-3.5">
+                      <img 
+                        src="/logo_transparent.svg" 
+                        alt="Tufwud Logo" 
+                        className="w-13 h-13 object-contain shrink-0" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
+                          SDTOWER PROJECT EXECUTIVE
+                        </span>
+                        <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
+                          TOWER-WISE INTERIM PAYMENT CERTIFICATE
+                        </h2>
+                      </div>
                     </div>
                     <div className="text-right font-mono text-xs text-zinc-550 space-y-0.5 font-bold shrink-0">
                       <div>Cert No: TC-{flats[0]?.oaNo || '387026'}-ALL</div>
@@ -1432,13 +1448,21 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 <div className="space-y-6">
                   {/* Certificate Heading Board */}
                   <div className="border-b-4 border-amber-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-extrabold tracking-wider bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-amber-200">
-                        EXECUTIVE SUMMARY CONTRACT
-                      </span>
-                      <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
-                        PROJECT MASTER PAYMENT CLEARANCE CERTIFICATE
-                      </h2>
+                    <div className="flex items-center gap-3.5">
+                      <img 
+                        src="/logo_transparent.svg" 
+                        alt="Tufwud Logo" 
+                        className="w-13 h-13 object-contain shrink-0" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-extrabold tracking-wider bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-amber-200">
+                          EXECUTIVE SUMMARY CONTRACT
+                        </span>
+                        <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
+                          PROJECT MASTER PAYMENT CLEARANCE CERTIFICATE
+                        </h2>
+                      </div>
                     </div>
                     <div className="text-right font-mono text-xs text-zinc-550 space-y-0.5 font-bold shrink-0">
                       <div>OANo: {flats[0]?.oaNo || '387026'}</div>
@@ -1518,13 +1542,21 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 <div className="space-y-6">
                   {/* Certificate Heading Board */}
                   <div className="border-b-4 border-indigo-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
-                        RUNNING ACCOUNT (R.A.) BILL CERTIFICATE
-                      </span>
-                      <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
-                        WORK DONE CERTIFICATE &amp; PAYMENT ADVICE
-                      </h2>
+                    <div className="flex items-center gap-3.5">
+                      <img 
+                        src="/logo_transparent.svg" 
+                        alt="Tufwud Logo" 
+                        className="w-13 h-13 object-contain shrink-0" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
+                          RUNNING ACCOUNT (R.A.) BILL CERTIFICATE
+                        </span>
+                        <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
+                          WORK DONE CERTIFICATE &amp; PAYMENT ADVICE
+                        </h2>
+                      </div>
                     </div>
                     <div className="text-right font-mono text-xs text-zinc-550 space-y-0.5 font-bold shrink-0">
                       <div>OA No: {flats[0]?.oaNo || '387026'}</div>

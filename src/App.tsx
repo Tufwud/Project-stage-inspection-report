@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FlatRecord, MilestoneKey, SavedProject } from './types';
+import { FlatRecord, MilestoneKey, SavedProject, MILESTONES } from './types';
 import { DEFAULT_FLATS, DOOR_MAP } from './data/mockData';
 import { getProjectAnalysis } from './utils';
 
@@ -505,6 +505,48 @@ export default function App() {
     saveFlats(updatedList);
   };
 
+  const handleBulkApproveFlat = (flatId: string) => {
+    const updatedList = flats.map(flat => {
+      if (flat.id !== flatId) return flat;
+      const updated = { ...flat };
+      
+      const getLocalTimestamp = () => {
+        const d = new Date();
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hr = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hr}:${min}`;
+      };
+      
+      const currentTimestamp = getLocalTimestamp();
+      const currentSupervisor = supervisors[0] || "Aarif Taslim";
+      
+      MILESTONES.forEach(meta => {
+        const milestoneKey = meta.key;
+        const currentMilestone = { ...(updated[milestoneKey] || {}) } as any;
+        
+        Object.keys(meta.subtaskLabels).forEach(taskKey => {
+          currentMilestone[taskKey] = 'approved';
+        });
+        
+        if (!currentMilestone.doneBy) {
+          currentMilestone.doneBy = currentSupervisor;
+        }
+        if (!currentMilestone.timestamp) {
+          currentMilestone.timestamp = currentTimestamp;
+        }
+        
+        updated[milestoneKey] = currentMilestone;
+      });
+      
+      return updated;
+    });
+    
+    saveFlats(updatedList);
+  };
+
   const handleDeleteFlat = (id: string) => {
     const updatedList = flats.filter(f => f.id !== id);
     saveFlats(updatedList);
@@ -538,19 +580,27 @@ export default function App() {
       {/* Prime Header Block */}
       <header className="bg-white border-b border-zinc-200 py-6 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 uppercase tracking-widest leading-none font-mono">
-                project-stage-inspection
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <div className="flex items-center gap-4">
+            <img 
+              src="/logo.svg" 
+              alt="Tufwud Logo" 
+              className="w-14 h-14 object-contain rounded-xl border border-zinc-200/80 shadow-2xs shrink-0" 
+              referrerPolicy="no-referrer" 
+            />
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 uppercase tracking-widest leading-none font-mono">
+                  project-stage-inspection
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              </div>
+              <h1 className="text-2xl font-black text-zinc-900 tracking-tight">
+                Project Stage Inspection
+              </h1>
+              <p className="text-xs text-zinc-500 font-medium font-sans">
+                Dynamic tracking of installation completion stages, checkpoint checks, and quality compliance logs.
+              </p>
             </div>
-            <h1 className="text-2xl font-black text-zinc-900 tracking-tight">
-              Project Stage Inspection
-            </h1>
-            <p className="text-xs text-zinc-500 font-medium font-sans">
-              Dynamic tracking of installation completion stages, checkpoint checks, and quality compliance logs.
-            </p>
           </div>
 
           {/* Core overview meter */}
@@ -674,6 +724,7 @@ export default function App() {
               selectedFloor={selectedFloor}
               selectedMilestoneFilter={selectedMilestone}
               onClearGridFilters={handleClearGridFilters}
+              onBulkApproveFlat={handleBulkApproveFlat}
             />
 
             {/* Stage 5: CSV Synchronization Operations */}
