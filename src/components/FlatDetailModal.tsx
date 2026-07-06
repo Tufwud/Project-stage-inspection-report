@@ -74,38 +74,6 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
     }
   };
 
-  // ERP PDF Upload logic
-  const handleErpPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setFormData(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          erpWorkOrder: {
-            name: file.name,
-            date: new Date().toLocaleDateString('en-GB'),
-            size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-            url: reader.result as string
-          }
-        };
-      });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveErpPdf = () => {
-    setFormData(prev => {
-      if (!prev) return null;
-      const updated = { ...prev };
-      delete updated.erpWorkOrder;
-      return updated;
-    });
-  };
-
   // Stage-wise Photo Upload logic
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, isCamera: boolean) => {
     const file = e.target.files?.[0];
@@ -431,14 +399,6 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
             <div class="fin-title">Overall Quality Compliance Progress</div>
             <div class="fin-val" style="color:#10b981">${overallProgress}%</div>
           </div>
-          <div class="fin-card">
-            <div class="fin-title">Contract Cost (Base target)</div>
-            <div class="fin-val">₹${basePrice.toLocaleString()}</div>
-          </div>
-          <div class="fin-card">
-            <div class="fin-title">Earned Progress Value</div>
-            <div class="fin-val" style="color:#2563eb">₹${totalCost.toLocaleString()}</div>
-          </div>
         </div>
 
         <div style="font-size:14px; font-weight:bold; margin-bottom:15px; color:#0f172a; text-transform: uppercase;">Checkpoint Compliance Details</div>
@@ -680,84 +640,6 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                     min="0"
                   />
                 </div>
-              </div>
-
-              {/* SECTION: ERP Work Order PDF Upload */}
-              <div className="col-span-2 bg-zinc-50/50 rounded-2xl border border-zinc-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-700 uppercase tracking-tight flex items-center gap-1.5">
-                    <Paperclip className="w-4 h-4 text-zinc-500" />
-                    ERP Work Order (PDF)
-                  </span>
-                  {formData.erpWorkOrder && (
-                    <span className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
-                      Costing Verified
-                    </span>
-                  )}
-                </div>
-
-                {!formData.erpWorkOrder ? (
-                  <div className="border border-dashed border-zinc-300 rounded-xl p-4 text-center hover:bg-zinc-100/50 transition relative">
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      onChange={handleErpPdfUpload}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      id="erp-pdf-file-upload"
-                    />
-                    <div className="space-y-1">
-                      <div className="inline-flex items-center justify-center p-2 bg-zinc-100 text-zinc-500 rounded-full border border-zinc-200">
-                        <FileText className="w-5 h-5 text-indigo-500" />
-                      </div>
-                      <p className="text-xs font-bold text-zinc-700">Click or Drag to Upload ERP Work Order</p>
-                      <p className="text-[10px] text-zinc-400 font-semibold font-mono uppercase">PDF Format Only</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-white border border-zinc-200 rounded-xl p-3 flex items-center justify-between gap-3 shadow-3xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100 shrink-0">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-zinc-900 truncate font-mono">{formData.erpWorkOrder.name}</p>
-                        <p className="text-[10px] text-zinc-400 font-bold font-mono">
-                          {formData.erpWorkOrder.size} &bull; {formData.erpWorkOrder.date}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <a
-                        href={formData.erpWorkOrder.url}
-                        download={formData.erpWorkOrder.name}
-                        className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 text-zinc-500 hover:text-indigo-650 transition cursor-pointer"
-                        title="Download ERP PDF"
-                      >
-                        <Download className="w-4 h-4" />
-                      </a>
-                      <button
-                        type="button"
-                        onClick={handleRemoveErpPdf}
-                        className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-500 transition cursor-pointer"
-                        title="Remove Document"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                <p className="text-[9px] text-zinc-400 leading-normal font-semibold font-mono uppercase bg-zinc-100 p-2 rounded-lg border border-zinc-200/55">
-                  📂 Path: {oaNo4Digit === '4027' ? (
-                    <>
-                      <a href="https://drive.google.com/drive/u/0/folders/1xcRODlPVO19nbHIlbF3tomz1ruSnaRFz" target="_blank" rel="noopener noreferrer" className="text-indigo-650 font-extrabold hover:underline">4027 - Site Supervisor Folder</a> / ERP_Work_Order.pdf
-                    </>
-                  ) : (
-                    <>
-                      <a href="https://drive.google.com/drive/u/0/folders/133DwBuxmLdK9PozyOfJS8XkRrAxJxi8-" target="_blank" rel="noopener noreferrer" className="text-indigo-650 font-extrabold hover:underline">Google Drive (Shared Master)</a> / {oaNo4Digit} / {oaNo4Digit} - Site Supervisor Folder / ERP_Work_Order.pdf
-                    </>
-                  )}
-                </p>
               </div>
             </div>
 

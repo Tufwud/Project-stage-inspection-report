@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FlatRecord } from '../types';
+import { TufwudLogoTransparent } from './TufwudLogo';
 import { 
   getFlatBasePrice, 
   getFlatTotalCompletedCost, 
@@ -1195,12 +1196,9 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                           {/* Certificate Heading Board */}
                           <div className="border-b-4 border-emerald-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-3.5">
-                              <img 
-                                src="/logo_transparent.svg" 
-                                alt="Tufwud Logo" 
-                                className="w-13 h-13 object-contain shrink-0" 
-                                referrerPolicy="no-referrer"
-                              />
+                              <div className="w-13 h-13 shrink-0">
+                                <TufwudLogoTransparent className="w-full h-full" />
+                              </div>
                               <div className="space-y-1">
                                 <span className="text-[10px] font-extrabold tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-emerald-200">
                                   TUFWUD DOOR COMPLIANCE PROTOCOL
@@ -1350,12 +1348,9 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                   {/* Certificate Heading Board */}
                   <div className="border-b-4 border-indigo-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
-                      <img 
-                        src="/logo_transparent.svg" 
-                        alt="Tufwud Logo" 
-                        className="w-13 h-13 object-contain shrink-0" 
-                        referrerPolicy="no-referrer"
-                      />
+                      <div className="w-13 h-13 shrink-0">
+                        <TufwudLogoTransparent className="w-full h-full" />
+                      </div>
                       <div className="space-y-1">
                         <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
                           SDTOWER PROJECT EXECUTIVE
@@ -1449,12 +1444,9 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                   {/* Certificate Heading Board */}
                   <div className="border-b-4 border-amber-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
-                      <img 
-                        src="/logo_transparent.svg" 
-                        alt="Tufwud Logo" 
-                        className="w-13 h-13 object-contain shrink-0" 
-                        referrerPolicy="no-referrer"
-                      />
+                      <div className="w-13 h-13 shrink-0">
+                        <TufwudLogoTransparent className="w-full h-full" />
+                      </div>
                       <div className="space-y-1">
                         <span className="text-[10px] font-extrabold tracking-wider bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-amber-200">
                           EXECUTIVE SUMMARY CONTRACT
@@ -1543,12 +1535,9 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                   {/* Certificate Heading Board */}
                   <div className="border-b-4 border-indigo-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
-                      <img 
-                        src="/logo_transparent.svg" 
-                        alt="Tufwud Logo" 
-                        className="w-13 h-13 object-contain shrink-0" 
-                        referrerPolicy="no-referrer"
-                      />
+                      <div className="w-13 h-13 shrink-0">
+                        <TufwudLogoTransparent className="w-full h-full" />
+                      </div>
                       <div className="space-y-1">
                         <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
                           RUNNING ACCOUNT (R.A.) BILL CERTIFICATE

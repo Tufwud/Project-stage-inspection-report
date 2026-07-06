@@ -94,7 +94,7 @@ export default function BackgroundValuesTab({
   }, [supervisorList, supervisor]);
 
   // Specs & Master opening codes custom state
-  const [customDoorCodes, setCustomDoorCodes] = useState('A, B, C, D');
+  const [customDoorCodes, setCustomDoorCodes] = useState('A, B, C, D, E, F');
   const [customGenericNames, setCustomGenericNames] = useState('Main Door (MD), Bedroom 1 (BR1), Bedroom 2 (BR2), Toilet 1 (T1), Toilet 2 (T2), Balcony');
   const [useCustomCodes, setUseCustomCodes] = useState(true);
 
@@ -791,7 +791,11 @@ export default function BackgroundValuesTab({
                       {/* Map preview */}
                       <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200/60 divide-y divide-zinc-200/50 text-xs text-zinc-650 space-y-1 max-h-40 overflow-y-auto">
                         {parsedDoors.map((name, idx) => {
-                          const standardPrice = doorPrices[name] ?? 5000;
+                          let matchedCode = Object.keys(doorNames).find(code => doorNames[code] === name);
+                          if (!matchedCode) {
+                            matchedCode = Object.keys(DOOR_MAP).find(code => DOOR_MAP[code] === name);
+                          }
+                          const standardPrice = (matchedCode ? doorPrices[matchedCode] : undefined) ?? doorPrices[name] ?? 5000;
                           return (
                             <div key={idx} className="flex justify-between items-center py-1 text-[11px]">
                               <span className="font-mono font-bold text-zinc-400">#{idx + 1}</span>

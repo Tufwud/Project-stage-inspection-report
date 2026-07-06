@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FlatRecord, MilestoneKey, SavedProject, MILESTONES } from './types';
 import { DEFAULT_FLATS, DOOR_MAP } from './data/mockData';
 import { getProjectAnalysis } from './utils';
+import { TufwudLogo } from './components/TufwudLogo';
 
 // Import Components
 import OverviewStats from './components/OverviewStats';
@@ -19,6 +20,13 @@ import { motion, AnimatePresence } from 'motion/react';
 
 const LOCAL_STORAGE_KEY = "door_quality_compliance_dashboard_records";
 
+const getOrdinalSuffix = (num: number) => {
+  if (num % 10 === 1 && num % 100 !== 11) return 'st';
+  if (num % 10 === 2 && num % 100 !== 12) return 'nd';
+  if (num % 10 === 3 && num % 100 !== 13) return 'rd';
+  return 'th';
+};
+
 export default function App() {
   const [flats, setFlats] = useState<FlatRecord[]>([]);
   const [selectedMilestone, setSelectedMilestone] = useState<MilestoneKey | null>(null);
@@ -29,12 +37,12 @@ export default function App() {
 
   // Master Cost Structure for Opening Codes (A, B, C, D, etc. - Editable & Overwriteable)
   const [doorPrices, setDoorPrices] = useState<{ [code: string]: number }>({
-    A: 12000,
-    B: 8500,
-    C: 7000,
-    D: 5500,
-    E: 5500,
-    F: 6000,
+    A: 5000,
+    B: 5000,
+    C: 5000,
+    D: 5000,
+    E: 5000,
+    F: 5000,
     G: 5000,
     H: 5000,
     I: 5000,
@@ -134,13 +142,6 @@ export default function App() {
     }
 
     const generated: FlatRecord[] = [];
-    
-    const getOrdinalSuffix = (num: number) => {
-      if (num % 10 === 1 && num % 100 !== 11) return 'st';
-      if (num % 10 === 2 && num % 100 !== 12) return 'nd';
-      if (num % 10 === 3 && num % 100 !== 13) return 'rd';
-      return 'th';
-    };
 
     const supervisorVal = config.supervisor?.trim() || "Aarif Taslim";
     const contractorVal = config.contractor?.trim() || "Prabir Dhol";
@@ -160,8 +161,23 @@ export default function App() {
             // CONVERT CODE TO NAME (Lookup in doorNames then fallbacks)
             const realName = doorNames[doorCodeOrName] || DOOR_MAP[doorCodeOrName] || doorCodeOrName;
 
+            const normName = realName.trim().toUpperCase();
+            if (!realName.trim() || normName === 'NA' || normName === 'N/A' || normName === 'NOT APPLICABLE') {
+              return; // Skip generating N/A or empty door specifications
+            }
+
             // Retrieve the spec cost mapped to this opening code
-            const price = config.doorPrices[doorCodeOrName] ?? 5000;
+            let price = config.doorPrices[doorCodeOrName];
+            if (price === undefined) {
+              const matchedCode = Object.keys(doorNames).find(code => doorNames[code] === realName)
+                || Object.keys(DOOR_MAP).find(code => DOOR_MAP[code] === realName);
+              if (matchedCode) {
+                price = config.doorPrices[matchedCode];
+              }
+            }
+            if (price === undefined) {
+              price = 5000;
+            }
 
             // Unique ID Format: OA/Tower/Floor/Flat/DoorName (exactly matching user's AppScript)
             const uniqueID = `${config.salesOrderNo}/${towerId}/${floorName}/${flatNumber}/${realName}`;
@@ -260,19 +276,47 @@ export default function App() {
           }
         }
         
+        let finalDoorName = flat.doorName;
+        let finalPrice = flat.price;
         if (matchedCode) {
-          const newName = newNames[matchedCode] || flat.doorName;
-          const newPrice = newPrices[matchedCode] ?? flat.price;
+          finalDoorName = newNames[matchedCode] || flat.doorName;
+          finalPrice = newPrices[matchedCode] ?? flat.price;
+        }
+
+        const normName = finalDoorName.trim().toUpperCase();
+        if (!finalDoorName || normName === 'NA' || normName === 'N/A' || normName === 'NOT APPLICABLE') {
           return {
             ...flat,
-            doorName: newName,
-            price: newPrice
+            doorName: '',
+            price: finalPrice
           };
         }
-        return flat;
+
+        const floorName = flat.floor + getOrdinalSuffix(flat.floor) + ' Floor';
+        const newID = `${flat.oaNo}/${flat.towerId}/${floorName}/${flat.flatNo}/${finalDoorName}`;
+
+        return {
+          ...flat,
+          id: newID,
+          doorName: finalDoorName,
+          price: finalPrice
+        };
       });
 
-      saveFlats(updatedFlats, newPrices);
+      const seenIds = new Set<string>();
+      const alignedFlats = updatedFlats.filter(f => {
+        const normName = (f.doorName || '').trim().toUpperCase();
+        if (!f.doorName || normName === 'NA' || normName === 'N/A' || normName === 'NOT APPLICABLE') {
+          return false;
+        }
+        if (seenIds.has(f.id)) {
+          return false;
+        }
+        seenIds.add(f.id);
+        return true;
+      });
+
+      saveFlats(alignedFlats, newPrices);
     }
   };
 
@@ -389,6 +433,20 @@ export default function App() {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
         initialFlats = JSON.parse(saved);
+        if (Array.isArray(initialFlats)) {
+          const seenIds = new Set<string>();
+          initialFlats = initialFlats.filter(flat => {
+            const normName = (flat.doorName || '').trim().toUpperCase();
+            if (!flat.doorName || normName === 'NA' || normName === 'N/A' || normName === 'NOT APPLICABLE') {
+              return false;
+            }
+            if (seenIds.has(flat.id)) {
+              return false;
+            }
+            seenIds.add(flat.id);
+            return true;
+          });
+        }
         setFlats(initialFlats);
       } else {
         initialFlats = DEFAULT_FLATS;
@@ -412,7 +470,28 @@ export default function App() {
     try {
       const savedHistory = localStorage.getItem("door_quality_compliance_dashboard_history");
       if (savedHistory) {
-        setSavedProjects(JSON.parse(savedHistory));
+        const parsedHistory = JSON.parse(savedHistory);
+        if (Array.isArray(parsedHistory)) {
+          const cleanedHistory = parsedHistory.map((proj: SavedProject) => {
+            const seenIds = new Set<string>();
+            const cleanedFlats = (proj.flats || []).filter(flat => {
+              const normName = (flat.doorName || '').trim().toUpperCase();
+              if (!flat.doorName || normName === 'NA' || normName === 'N/A' || normName === 'NOT APPLICABLE') {
+                return false;
+              }
+              if (seenIds.has(flat.id)) {
+                return false;
+              }
+              seenIds.add(flat.id);
+              return true;
+            });
+            return {
+              ...proj,
+              flats: cleanedFlats
+            };
+          });
+          setSavedProjects(cleanedHistory);
+        }
       } else {
         // Preinstall current loaded flats into the history registry
         const activeSO = initialFlats[0]?.oaNo || "OA-2026-9041";
@@ -425,12 +504,16 @@ export default function App() {
           flatsPerFloor: 4,
           doorTypesToGenerate: Array.from(new Set(initialFlats.map(f => f.doorName))),
           doorPrices: {
-            A: 12000,
-            B: 8500,
-            C: 7000,
-            D: 5500,
-            E: 5500,
-            F: 6000
+            A: 5000,
+            B: 5000,
+            C: 5000,
+            D: 5000,
+            E: 5000,
+            F: 5000,
+            G: 5000,
+            H: 5000,
+            I: 5000,
+            J: 5000
           }
         };
         const initialHistoryList = [dummyHistoryRecord];
@@ -581,12 +664,9 @@ export default function App() {
       <header className="bg-white border-b border-zinc-200 py-6 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <img 
-              src="/logo.svg" 
-              alt="Tufwud Logo" 
-              className="w-14 h-14 object-contain rounded-xl border border-zinc-200/80 shadow-2xs shrink-0" 
-              referrerPolicy="no-referrer" 
-            />
+            <div className="w-14 h-14 shrink-0 rounded-xl border border-zinc-200/80 shadow-2xs overflow-hidden bg-[#a14730]">
+              <TufwudLogo className="w-full h-full" />
+            </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 uppercase tracking-widest leading-none font-mono">
