@@ -176,31 +176,41 @@ export default function BackgroundValuesTab({
     id: string;
     towerFrom: number;
     towerTo: number;
-    stageId: 'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover';
+    stageId?: string; // fallback for older rules
+    stageIds?: string[]; // array of stage keys
     contractorName: string;
   }
 
   const [contractorRules, setContractorRules] = useState<ContractorRule[]>(() => {
     try {
       const saved = localStorage.getItem("door_quality_compliance_dashboard_contractor_rules");
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        // Safe check to verify parsed data is valid array
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch (e) {}
     return [
-      { id: '1', towerFrom: 1, towerTo: 10, stageId: 'any', contractorName: 'Contractor A' },
-      { id: '2', towerFrom: 11, towerTo: 20, stageId: 'any', contractorName: 'Contractor B' },
-      { id: '3', towerFrom: 1, towerTo: 100, stageId: 'frameFixing', contractorName: 'Frame Masters Ltd' },
-      { id: '4', towerFrom: 1, towerTo: 100, stageId: 'doorFixing', contractorName: 'Shutter Tech Co' }
+      { id: '1', towerFrom: 1, towerTo: 10, stageIds: ['frameFixing', 'doorFixing', 'hardwareFixing', 'painting', 'handover'], contractorName: 'Contractor A' },
+      { id: '2', towerFrom: 11, towerTo: 20, stageIds: ['frameFixing', 'doorFixing', 'hardwareFixing', 'painting', 'handover'], contractorName: 'Contractor B' },
+      { id: '3', towerFrom: 1, towerTo: 100, stageIds: ['frameFixing'], contractorName: 'Frame Masters Ltd' },
+      { id: '4', towerFrom: 1, towerTo: 100, stageIds: ['doorFixing'], contractorName: 'Shutter Tech Co' }
     ];
   });
 
   const [newRuleTowerFrom, setNewRuleTowerFrom] = useState('1');
   const [newRuleTowerTo, setNewRuleTowerTo] = useState('10');
-  const [newRuleStageId, setNewRuleStageId] = useState<'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover'>('any');
+  const [selectedStageIds, setSelectedStageIds] = useState<string[]>(['frameFixing', 'doorFixing', 'hardwareFixing', 'painting', 'handover']);
   const [newRuleContractorName, setNewRuleContractorName] = useState('');
 
   const handleAddContractorRule = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRuleContractorName.trim()) return;
+    if (selectedStageIds.length === 0) {
+      setPriceSuccessBanner("Error: Please select at least one milestone stage checkbox!");
+      setTimeout(() => setPriceSuccessBanner(null), 3500);
+      return;
+    }
 
     const fromNum = parseInt(newRuleTowerFrom) || 1;
     const toNum = parseInt(newRuleTowerTo) || 1;
@@ -209,7 +219,7 @@ export default function BackgroundValuesTab({
       id: Date.now().toString(),
       towerFrom: Math.min(fromNum, toNum),
       towerTo: Math.max(fromNum, toNum),
-      stageId: newRuleStageId,
+      stageIds: [...selectedStageIds],
       contractorName: newRuleContractorName.trim()
     };
 
@@ -249,6 +259,7 @@ export default function BackgroundValuesTab({
       newFlat.frameFixing = { ...flat.frameFixing };
       newFlat.doorFixing = { ...flat.doorFixing };
       newFlat.hardwareFixing = { ...flat.hardwareFixing };
+      newFlat.painting = { ...flat.painting };
       newFlat.handover = { ...flat.handover };
 
       // Find rules that apply to this flat's tower and stage
@@ -257,20 +268,30 @@ export default function BackgroundValuesTab({
         if (isTowerInRange) {
           const name = rule.contractorName.trim();
           if (name) {
-            if (rule.stageId === 'any') {
+            const stageIds = rule.stageIds || (rule.stageId ? [rule.stageId] : []);
+            if (stageIds.includes('any')) {
               newFlat.frameFixing.contractor = name;
               newFlat.doorFixing.contractor = name;
               newFlat.hardwareFixing.contractor = name;
+              newFlat.painting.contractor = name;
               newFlat.handover.contractor = name;
               newFlat.contractor = name; // Top-level flat contractor as fallback
-            } else if (rule.stageId === 'frameFixing') {
-              newFlat.frameFixing.contractor = name;
-            } else if (rule.stageId === 'doorFixing') {
-              newFlat.doorFixing.contractor = name;
-            } else if (rule.stageId === 'hardwareFixing') {
-              newFlat.hardwareFixing.contractor = name;
-            } else if (rule.stageId === 'handover') {
-              newFlat.handover.contractor = name;
+            } else {
+              if (stageIds.includes('frameFixing')) {
+                newFlat.frameFixing.contractor = name;
+              }
+              if (stageIds.includes('doorFixing')) {
+                newFlat.doorFixing.contractor = name;
+              }
+              if (stageIds.includes('hardwareFixing')) {
+                newFlat.hardwareFixing.contractor = name;
+              }
+              if (stageIds.includes('painting')) {
+                newFlat.painting.contractor = name;
+              }
+              if (stageIds.includes('handover')) {
+                newFlat.handover.contractor = name;
+              }
             }
           }
         }
@@ -1276,19 +1297,53 @@ export default function BackgroundValuesTab({
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-550 font-bold uppercase">Milestone Stage</label>
-                    <select
-                      value={newRuleStageId}
-                      onChange={(e: any) => setNewRuleStageId(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="any">All Milestone Stages (General)</option>
-                      <option value="frameFixing">Frame Fixing / Installation</option>
-                      <option value="doorFixing">Door / Shutter Installation</option>
-                      <option value="hardwareFixing">Hardware Fitting</option>
-                      <option value="handover">De-snagging & Handover</option>
-                    </select>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-zinc-550 font-bold uppercase block mb-1">
+                      Milestone Stages (Multi-Select Checkboxes)
+                    </label>
+                    <div className="space-y-1.5 bg-white border border-zinc-200 rounded-lg p-2.5 max-h-48 overflow-y-auto">
+                      <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 border-b border-zinc-100 pb-1.5 mb-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                          checked={selectedStageIds.length === 5}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedStageIds(['frameFixing', 'doorFixing', 'hardwareFixing', 'painting', 'handover']);
+                            } else {
+                              setSelectedStageIds([]);
+                            }
+                          }}
+                        />
+                        <span>Select All Stages</span>
+                      </label>
+                      {[
+                        { id: 'frameFixing', label: 'Frame Fixing / Installation' },
+                        { id: 'doorFixing', label: 'Door / Shutter Installation' },
+                        { id: 'hardwareFixing', label: 'Hardware Fitting' },
+                        { id: 'painting', label: 'Touch-up & Painting' },
+                        { id: 'handover', label: 'De-snagging & Handover' }
+                      ].map((stg) => {
+                        const isChecked = selectedStageIds.includes(stg.id);
+                        return (
+                          <label key={stg.id} className="flex items-center gap-2 text-xs text-zinc-700 cursor-pointer hover:bg-zinc-50 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setSelectedStageIds(selectedStageIds.filter(id => id !== stg.id));
+                                } else {
+                                  setSelectedStageIds([...selectedStageIds, stg.id]);
+                                }
+                              }}
+                            />
+                            <span className="font-semibold">{stg.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="space-y-1">
@@ -1325,11 +1380,21 @@ export default function BackgroundValuesTab({
                       </div>
                     ) : (
                       contractorRules.map((rule) => {
-                        const stageLabel = 
-                          rule.stageId === 'any' ? 'All Stages' :
-                          rule.stageId === 'frameFixing' ? 'Frame Fixing' :
-                          rule.stageId === 'doorFixing' ? 'Shutter Fixing' :
-                          rule.stageId === 'hardwareFixing' ? 'Hardware Fitting' : 'Handover';
+                        const getRuleStagesLabel = (r: any) => {
+                          const ids = r.stageIds || (r.stageId ? [r.stageId] : []);
+                          if (ids.includes('any')) {
+                            return ['All Stages'];
+                          }
+                          const mapping: { [key: string]: string } = {
+                            frameFixing: 'Frame Fixing',
+                            doorFixing: 'Shutter Fixing',
+                            hardwareFixing: 'Hardware Fitting',
+                            painting: 'Painting',
+                            handover: 'Handover'
+                          };
+                          return ids.map((id: string) => mapping[id] || id);
+                        };
+                        const stageLabels = getRuleStagesLabel(rule);
 
                         return (
                           <div key={rule.id} className="flex items-center justify-between p-2.5 border border-zinc-150 rounded-xl bg-white hover:bg-zinc-50/50 transition gap-2">
@@ -1338,9 +1403,11 @@ export default function BackgroundValuesTab({
                                 <span className="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg font-mono">
                                   Towers {rule.towerFrom}-{rule.towerTo}
                                 </span>
-                                <span className="text-[10px] font-bold bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg font-mono">
-                                  {stageLabel}
-                                </span>
+                                {stageLabels.map((lbl, idx) => (
+                                  <span key={idx} className="text-[10px] font-bold bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg font-mono">
+                                    {lbl}
+                                  </span>
+                                ))}
                               </div>
                               <p className="text-xs font-extrabold text-zinc-800">
                                 Assigned: {rule.contractorName}

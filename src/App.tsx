@@ -223,20 +223,30 @@ export default function App() {
               if (isTowerInRange) {
                 const name = rule.contractorName?.trim();
                 if (name) {
-                  if (rule.stageId === 'any') {
+                  const stageIds = rule.stageIds || (rule.stageId ? [rule.stageId] : []);
+                  if (stageIds.includes('any')) {
                     flat.frameFixing.contractor = name;
                     flat.doorFixing.contractor = name;
                     flat.hardwareFixing.contractor = name;
+                    flat.painting.contractor = name;
                     flat.handover.contractor = name;
                     flat.contractor = name;
-                  } else if (rule.stageId === 'frameFixing') {
-                    flat.frameFixing.contractor = name;
-                  } else if (rule.stageId === 'doorFixing') {
-                    flat.doorFixing.contractor = name;
-                  } else if (rule.stageId === 'hardwareFixing') {
-                    flat.hardwareFixing.contractor = name;
-                  } else if (rule.stageId === 'handover') {
-                    flat.handover.contractor = name;
+                  } else {
+                    if (stageIds.includes('frameFixing')) {
+                      flat.frameFixing.contractor = name;
+                    }
+                    if (stageIds.includes('doorFixing')) {
+                      flat.doorFixing.contractor = name;
+                    }
+                    if (stageIds.includes('hardwareFixing')) {
+                      flat.hardwareFixing.contractor = name;
+                    }
+                    if (stageIds.includes('painting')) {
+                      flat.painting.contractor = name;
+                    }
+                    if (stageIds.includes('handover')) {
+                      flat.handover.contractor = name;
+                    }
                   }
                 }
               }
