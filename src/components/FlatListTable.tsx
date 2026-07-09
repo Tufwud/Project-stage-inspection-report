@@ -13,6 +13,7 @@ interface FlatListTableProps {
   selectedMilestoneFilter: string | null;
   onClearGridFilters: () => void;
   onBulkApproveFlat?: (flatId: string) => void;
+  onUpdateFlats?: (updatedList: FlatRecord[]) => void;
 }
 
 type SortField = 'id' | 'flatNo' | 'floor' | 'progress';
@@ -26,7 +27,8 @@ export default function FlatListTable({
   selectedFloor,
   selectedMilestoneFilter,
   onClearGridFilters,
-  onBulkApproveFlat
+  onBulkApproveFlat,
+  onUpdateFlats
 }: FlatListTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewFinderQuery, setViewFinderQuery] = useState('');
@@ -36,9 +38,14 @@ export default function FlatListTable({
   const [sortField, setSortField] = useState<SortField>('flatNo');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
+  // Bulk operation states
+  const [selectedFlatIds, setSelectedFlatIds] = useState<string[]>([]);
+  const [bulkContractorName, setBulkContractorName] = useState<string>('');
+  const [bulkSelectedStageIds, setBulkSelectedStageIds] = useState<string[]>([]);
+
   // Contractor stage-wise state filters
   const [contractorSearch, setContractorSearch] = useState('');
-  const [contractorStage, setContractorStage] = useState<'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover'>('any');
+  const [contractorStage, setContractorStage] = useState<'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'painting' | 'handover'>('any');
 
   // Dynamically derive towers list from flats
   const dynamicTowers = Array.from(new Set(flats.map(f => f.towerId))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
@@ -79,8 +86,9 @@ export default function FlatListTable({
         const c1 = (flat.frameFixing?.contractor || '').toLowerCase();
         const c2 = (flat.doorFixing?.contractor || '').toLowerCase();
         const c3 = (flat.hardwareFixing?.contractor || '').toLowerCase();
-        const c4 = (flat.handover?.contractor || '').toLowerCase();
-        matchesContractor = c1.includes(q) || c2.includes(q) || c3.includes(q) || c4.includes(q);
+        const c4 = (flat.painting?.contractor || '').toLowerCase();
+        const c5 = (flat.handover?.contractor || '').toLowerCase();
+        matchesContractor = c1.includes(q) || c2.includes(q) || c3.includes(q) || c4.includes(q) || c5.includes(q);
       } else {
         const targetSection = flat[contractorStage];
         const stageC = (targetSection?.contractor || '').toLowerCase();
@@ -302,6 +310,7 @@ export default function FlatListTable({
               <option value="frameFixing">FRAME INSTALLATION CONTRACTOR</option>
               <option value="doorFixing">SHUTTER INSTALLATION CONTRACTOR</option>
               <option value="hardwareFixing">HARDWARE FITTING CONTRACTOR</option>
+              <option value="painting">TOUCH-UP & PAINTING CONTRACTOR</option>
               <option value="handover">HANDOVER CONTRACTOR</option>
             </select>
           </div>
@@ -309,11 +318,158 @@ export default function FlatListTable({
 
       </div>
 
+      {/* Bulk Action Controls */}
+      {selectedFlatIds.length > 0 && (
+        <div className="bg-zinc-900 text-white rounded-2xl p-5 shadow-lg border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-fadeIn">
+          <div className="space-y-1 md:max-w-xs shrink-0">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-indigo-400 shrink-0" />
+              <h4 className="font-extrabold text-sm tracking-tight text-white">Bulk Contractor Update</h4>
+            </div>
+            <p className="text-[11px] text-zinc-400 font-medium">
+              Assign contractor to <strong>{selectedFlatIds.length} selected door openings</strong>.
+            </p>
+          </div>
+
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Contractor Name */}
+            <div className="space-y-1">
+              <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Contractor Name</label>
+              <input
+                type="text"
+                placeholder="e.g. Prabir Dhol, Contractor A"
+                value={bulkContractorName}
+                onChange={(e) => setBulkContractorName(e.target.value)}
+                className="w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
+              />
+            </div>
+
+            {/* Stage Checklist Checkboxes */}
+            <div className="space-y-1 lg:col-span-2">
+              <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block mb-1">
+                Milestone Stages to Update (Multi-select)
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'frameFixing', label: 'Frame' },
+                  { id: 'doorFixing', label: 'Shutter' },
+                  { id: 'hardwareFixing', label: 'Hardware' },
+                  { id: 'painting', label: 'Painting' },
+                  { id: 'handover', label: 'Handover' }
+                ].map((stg) => {
+                  const isChecked = bulkSelectedStageIds.includes(stg.id);
+                  return (
+                    <label 
+                      key={stg.id} 
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold cursor-pointer transition ${
+                        isChecked 
+                          ? 'bg-indigo-600 border-indigo-500 text-white shadow-2xs' 
+                          : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-750'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={isChecked}
+                        onChange={() => {
+                          if (isChecked) {
+                            setBulkSelectedStageIds(bulkSelectedStageIds.filter(id => id !== stg.id));
+                          } else {
+                            setBulkSelectedStageIds([...bulkSelectedStageIds, stg.id]);
+                          }
+                        }}
+                      />
+                      <span>{stg.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedFlatIds([]);
+                setBulkSelectedStageIds([]);
+                setBulkContractorName('');
+              }}
+              className="px-3 py-2 bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 text-zinc-350 rounded-xl text-xs font-bold transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!bulkContractorName.trim()) {
+                  alert('Please enter a contractor name.');
+                  return;
+                }
+                if (bulkSelectedStageIds.length === 0) {
+                  alert('Please select at least one milestone stage.');
+                  return;
+                }
+                
+                // Perform update on parent flats array
+                const name = bulkContractorName.trim();
+                const updatedList = flats.map(flat => {
+                  if (!selectedFlatIds.includes(flat.id)) return flat;
+                  
+                  const updated = { ...flat };
+                  bulkSelectedStageIds.forEach(stg => {
+                    if (updated[stg]) {
+                      updated[stg] = {
+                        ...updated[stg],
+                        contractor: name
+                      };
+                    }
+                  });
+                  
+                  // Also update top-level contractor if fallback is appropriate
+                  updated.contractor = name;
+                  
+                  return updated;
+                });
+
+                if (onUpdateFlats) {
+                  onUpdateFlats(updatedList);
+                }
+                
+                // Clear state
+                setSelectedFlatIds([]);
+                setBulkSelectedStageIds([]);
+                setBulkContractorName('');
+              }}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-sm transition cursor-pointer"
+            >
+              Apply Bulk Rules
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table grid wrapper */}
       <div className="overflow-x-auto border border-zinc-100 rounded-xl">
         <table className="w-full text-left border-collapse table-auto">
           <thead>
             <tr className="bg-zinc-50 border-b border-zinc-200/50 text-xs font-bold text-zinc-500 tracking-wide">
+              {/* Checkbox Header */}
+              <th className="p-4 w-12 text-center">
+                <input 
+                  type="checkbox" 
+                  className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                  checked={sortedFlats.length > 0 && selectedFlatIds.length === sortedFlats.length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedFlatIds(sortedFlats.map(f => f.id));
+                    } else {
+                      setSelectedFlatIds([]);
+                    }
+                  }}
+                />
+              </th>
+
               <th className="p-4 cursor-pointer hover:bg-zinc-100/60" onClick={() => toggleSort('id')}>
                 <div className="flex items-center gap-1">
                   <span>ID</span>
@@ -334,6 +490,7 @@ export default function FlatListTable({
               <th className="p-4 text-center">Frame Fixing</th>
               <th className="p-4 text-center">Door Fixing</th>
               <th className="p-4 text-center">Hardware Fixing</th>
+              <th className="p-4 text-center">Touch-up & Painting</th>
               <th className="p-4 text-center">Handover</th>
 
               <th className="p-4 text-right cursor-pointer hover:bg-zinc-100/60" onClick={() => toggleSort('progress')}>
@@ -351,7 +508,7 @@ export default function FlatListTable({
           <tbody className="divide-y divide-zinc-100 text-sm font-medium text-zinc-800">
             {sortedFlats.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-10 text-zinc-400 font-semibold text-xs">
+                <td colSpan={12} className="text-center py-10 text-zinc-400 font-semibold text-xs">
                   No matching door opening records found in current filters.
                 </td>
               </tr>
@@ -361,6 +518,7 @@ export default function FlatListTable({
                 const ffPct = getMilestoneProgress(flat, 'frameFixing');
                 const dfPct = getMilestoneProgress(flat, 'doorFixing');
                 const hwPct = getMilestoneProgress(flat, 'hardwareFixing');
+                const ptPct = getMilestoneProgress(flat, 'painting');
                 const hoPct = getMilestoneProgress(flat, 'handover');
 
                 // Color generators for milestones
@@ -376,6 +534,22 @@ export default function FlatListTable({
                     onClick={() => onSelectFlat(flat)}
                     className="hover:bg-zinc-50/50 transition cursor-pointer"
                   >
+                    {/* Checkbox column */}
+                    <td className="p-4 w-12 text-center" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        checked={selectedFlatIds.includes(flat.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedFlatIds([...selectedFlatIds, flat.id]);
+                          } else {
+                            setSelectedFlatIds(selectedFlatIds.filter(id => id !== flat.id));
+                          }
+                        }}
+                      />
+                    </td>
+
                     {/* ID column */}
                     <td className="p-4 font-mono text-[11px] font-bold text-zinc-400">
                       {flat.id}
@@ -442,6 +616,20 @@ export default function FlatListTable({
                         {flat.hardwareFixing?.contractor && (
                           <span className="text-[9px] text-zinc-400 font-extrabold max-w-[80px] truncate" title={flat.hardwareFixing.contractor}>
                             {flat.hardwareFixing.contractor}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Touch-up & Painting Milestone status */}
+                    <td className="p-4 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`inline-block px-2.5 py-0.5 rounded-full border text-[10px] font-bold font-mono ${getMilestoneColor(ptPct)}`}>
+                          {ptPct}%
+                        </div>
+                        {flat.painting?.contractor && (
+                          <span className="text-[9px] text-zinc-400 font-extrabold max-w-[80px] truncate" title={flat.painting.contractor}>
+                            {flat.painting.contractor}
                           </span>
                         )}
                       </div>

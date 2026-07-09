@@ -8,6 +8,7 @@ import {
   getFinancialStageProgress,
   getFlatOverallProgress,
   getFinancialStagePct,
+  getSubtaskWeight,
   FINANCIAL_STAGES 
 } from '../utils';
 import { 
@@ -51,11 +52,16 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
   const [contractorStage, setContractorStage] = useState<'any' | 'frameFixing' | 'doorFixing' | 'hardwareFixing' | 'handover'>('any');
 
   // Certificate Specific States
-  const [certType, setCertType] = useState<'door' | 'tower' | 'project' | 'ra_bill'>('door');
+  const [certType, setCertType] = useState<'door' | 'tower' | 'project' | 'ra_bill' | 'handover'>('door');
   const [selectedCertTower, setSelectedCertTower] = useState('All');
   const [selectedCertContractor, setSelectedCertContractor] = useState('All');
   const [raFromDate, setRaFromDate] = useState('2026-06-01');
   const [raToDate, setRaToDate] = useState('2026-06-30');
+
+  // Handover letter / certificate specific state parameters
+  const [handoverMode, setHandoverMode] = useState<'certificate' | 'letter'>('certificate');
+  const [clientContactName, setClientContactName] = useState('Rahatul Hoque');
+  const [siteAddress, setSiteAddress] = useState('Godrej Woods, Sector 43, Noida, UP');
 
   // Running Bill Specific States
   const [selectedBillMonth, setSelectedBillMonth] = useState('All');
@@ -1105,6 +1111,12 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                   >
                     R.A. Bill
                   </button>
+                  <button
+                    onClick={() => setCertType('handover')}
+                    className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition uppercase ${certType === 'handover' ? 'bg-white text-indigo-700 shadow-3xs border border-zinc-200/50' : 'text-zinc-500'}`}
+                  >
+                    Handing Over
+                  </button>
                 </div>
               </div>
 
@@ -1122,7 +1134,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 </select>
               </div>
 
-              {/* Conditional Contractor & Dates for RA Bill, or general info badge */}
+              {/* Conditional Contractor & Dates for RA Bill, Handover Format, or general info badge */}
               {certType === 'ra_bill' ? (
                 <>
                   {/* Selector 3: Contractor Filter */}
@@ -1157,6 +1169,40 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                     </div>
                   </div>
                 </>
+              ) : certType === 'handover' ? (
+                <>
+                  {/* Selector 3: Handover Format toggle */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide font-mono">Handover Format</label>
+                    <div className="flex bg-zinc-100 rounded-xl p-1 border border-zinc-200">
+                      <button
+                        onClick={() => setHandoverMode('certificate')}
+                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition uppercase ${handoverMode === 'certificate' ? 'bg-white text-indigo-700 shadow-3xs border border-zinc-200/50' : 'text-zinc-500'}`}
+                      >
+                        Certificate
+                      </button>
+                      <button
+                        onClick={() => setHandoverMode('letter')}
+                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition uppercase ${handoverMode === 'letter' ? 'bg-white text-indigo-700 shadow-3xs border border-zinc-200/50' : 'text-zinc-500'}`}
+                      >
+                        Handover Letter
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Selector 4: Select Contractor */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Select Contractor</label>
+                    <select
+                      value={selectedCertContractor}
+                      onChange={(e) => setSelectedCertContractor(e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-250 rounded-xl text-xs font-bold text-zinc-700"
+                    >
+                      <option value="All">All Contractors</option>
+                      {uniqueContractors.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </>
               ) : (
                 <div className="sm:col-span-2 md:col-span-1 space-y-1.5 flex flex-col justify-end">
                   <div className="p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] text-zinc-500 font-medium">
@@ -1166,6 +1212,33 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
               )}
 
             </div>
+
+            {/* Extra inputs row for Handover Letter parameters */}
+            {certType === 'handover' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-zinc-150 pt-4 animate-fadeIn">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Client / Site Contact Name</label>
+                  <input
+                    type="text"
+                    value={clientContactName}
+                    onChange={(e) => setClientContactName(e.target.value)}
+                    placeholder="e.g. Rahatul Hoque"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Site Address</label>
+                  <input
+                    type="text"
+                    value={siteAddress}
+                    onChange={(e) => setSiteAddress(e.target.value)}
+                    placeholder="e.g. Godrej Woods, Sector 43, Noida, UP"
+                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                  />
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* PHYSICAL CERTIFICATES DECK (TARGET FOR PRINTING) */}
@@ -1204,7 +1277,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                                   TUFWUD DOOR COMPLIANCE PROTOCOL
                                 </span>
                                 <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
-                                  DOOR-WISE QUALITY &amp; PAYMENT CERTIFICATE
+                                  DOOR-WISE QUALITY COMPLIANCE CERTIFICATE
                                 </h2>
                               </div>
                             </div>
@@ -1242,18 +1315,17 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                           </div>
 
                           <p className="text-xs text-zinc-500 leading-relaxed font-medium">
-                            It is hereby certified that the work on the following specified fire door openings has been audited and cleared by site inspectors. Certified payments are calculated strictly per completed milestone ratios:
+                            It is hereby certified that the work on the following specified fire door openings has been audited and cleared by site inspectors. Quality compliance is verified against designated milestone standards:
                           </p>
 
-                          {/* EXACT 4 COLUMNS & 5 DOORS TABLE */}
+                          {/* EXACT 3 COLUMNS & 5 DOORS TABLE */}
                           <div className="border border-zinc-250 rounded-xl overflow-hidden shadow-2xs">
                             <table className="w-full text-left border-collapse text-xs">
                               <thead>
                                 <tr className="bg-zinc-100 text-zinc-650 font-black uppercase border-b border-zinc-250 text-[10px] tracking-wider font-mono">
-                                  <th className="px-5 py-3 w-1/4">Column 1: Opening ID &amp; Loc</th>
-                                  <th className="px-5 py-3 w-1/3">Column 2: Completed Work Stages</th>
-                                  <th className="px-5 py-3 text-center w-1/6">Column 3: Milestone %</th>
-                                  <th className="px-5 py-3 text-right w-1/4">Column 4: Certified Value</th>
+                                  <th className="px-5 py-3 w-1/3">Column 1: Opening ID &amp; Loc</th>
+                                  <th className="px-5 py-3 w-5/12">Column 2: Completed Work Stages</th>
+                                  <th className="px-5 py-3 text-center w-1/4">Column 3: Quality Compliance</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-zinc-200 font-semibold text-zinc-700">
@@ -1267,7 +1339,6 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                                   if (door.handover.keysHandover) completedStagesList.push('Audited & Handed Over');
                                   
                                   const progress = getFlatOverallProgress(door);
-                                  const earnedVal = getFlatTotalCompletedCost(door);
                                   
                                   return (
                                     <tr key={door.id} className="hover:bg-zinc-50/20 transition">
@@ -1288,11 +1359,16 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                                           </div>
                                         )}
                                       </td>
-                                      <td className="px-5 py-4 text-center font-mono font-bold text-zinc-800">
-                                        {progress}%
-                                      </td>
-                                      <td className="px-5 py-4 text-right font-mono font-bold text-emerald-700">
-                                        ₹{earnedVal.toLocaleString('en-IN')}
+                                      <td className="px-5 py-4 text-center">
+                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider font-mono ${
+                                          progress === 100 
+                                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                            : progress > 0
+                                              ? "bg-indigo-100 text-indigo-800 border border-indigo-200"
+                                              : "bg-zinc-100 text-zinc-500 border border-zinc-200"
+                                        }`}>
+                                          {progress === 100 ? "100% Cleared" : `${progress}% Done`}
+                                        </span>
                                       </td>
                                     </tr>
                                   );
@@ -1304,16 +1380,17 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
 
                         {/* Bottom Total Block + Signature Block */}
                         <div className="space-y-6 pt-6 border-t border-zinc-200">
-                          {/* PAGE WISE RUNNING TOTAL */}
+                          {/* PAGE COMPLIANCE RATIO */}
                           <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center justify-between">
                             <div className="space-y-0.5">
-                              <span className="block text-[9px] text-emerald-800 font-black uppercase tracking-wider font-mono">PAGE RUNNING TOTAL CERTIFIED</span>
-                              <span className="text-[10px] text-zinc-500 font-medium">Sum of contract value certified for the 5 door openings on this sheet.</span>
+                              <span className="block text-[9px] text-emerald-800 font-black uppercase tracking-wider font-mono">PAGE COMPLIANCE RATIO</span>
+                              <span className="text-[10px] text-zinc-500 font-medium">Proportion of door openings on this page that are fully completed.</span>
                             </div>
-                            <div className="text-right">
-                              <span className="text-xl font-black text-emerald-700 font-mono">
-                                ₹{pageSum.toLocaleString('en-IN')}
+                            <div className="text-right font-mono text-zinc-900">
+                              <span className="text-xl font-black text-emerald-700">
+                                {pageDoors.filter(d => getFlatOverallProgress(d) === 100).length} / {pageDoors.length}
                               </span>
+                              <span className="text-xs font-bold text-zinc-400 ml-1.5">OPENINGS COMPLETED</span>
                             </div>
                           </div>
 
@@ -1356,7 +1433,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                           SDTOWER PROJECT EXECUTIVE
                         </span>
                         <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
-                          TOWER-WISE INTERIM PAYMENT CERTIFICATE
+                          TOWER-WISE QUALITY COMPLIANCE CERTIFICATE
                         </h2>
                       </div>
                     </div>
@@ -1368,7 +1445,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                   </div>
 
                   <p className="text-xs text-zinc-500 leading-relaxed font-medium">
-                    This certifies that progressive payouts are authorized for work completed on the following project tower segments. Totals represent accumulated audits:
+                    This certifies that quality audits have been completed on the following project tower segments. Totals represent accumulated compliance checklists:
                   </p>
 
                   <div className="border border-zinc-250 rounded-xl overflow-hidden shadow-2xs">
@@ -1378,8 +1455,6 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                           <th className="px-5 py-3.5">Segment Tower Name</th>
                           <th className="px-5 py-3.5 text-center">Audited Openings</th>
                           <th className="px-5 py-3.5 text-center">100% Handed Over</th>
-                          <th className="px-5 py-3.5 text-right font-mono">Tower Budget</th>
-                          <th className="px-5 py-3.5 text-right font-mono">Payout Certified</th>
                           <th className="px-5 py-3.5 text-center">Progress %</th>
                         </tr>
                       </thead>
@@ -1391,8 +1466,6 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                               <td className="px-5 py-4 font-bold text-zinc-950">{t.towerName}</td>
                               <td className="px-5 py-4 text-center font-mono">{t.totalDoors}</td>
                               <td className="px-5 py-4 text-center font-mono text-emerald-650 font-bold">{t.completedDoors}</td>
-                              <td className="px-5 py-4 text-right font-mono text-zinc-600">₹{t.totalBudget.toLocaleString('en-IN')}</td>
-                              <td className="px-5 py-4 text-right font-mono text-emerald-750 font-bold">₹{t.totalEarned.toLocaleString('en-IN')}</td>
                               <td className="px-5 py-4 text-center font-mono">
                                 <span className="px-2 py-0.5 bg-zinc-100 text-zinc-800 border border-zinc-200 rounded font-black text-[10px]">
                                   {rate}%
@@ -1409,13 +1482,14 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 <div className="space-y-6 pt-6 border-t border-zinc-200">
                   <div className="p-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl flex items-center justify-between">
                     <div>
-                      <span className="block text-[9px] text-indigo-850 font-black uppercase tracking-wider font-mono">TOTAL TOWER PORTFOLIO CERTIFIED</span>
-                      <span className="text-[10px] text-zinc-500 font-medium">Reconciles verified progressive payouts across all mapped towers.</span>
+                      <span className="block text-[9px] text-indigo-850 font-black uppercase tracking-wider font-mono">TOTAL TOWER PORTFOLIO COMPLIANCE</span>
+                      <span className="text-[10px] text-zinc-500 font-medium">Reconciles verified compliance audits and handed over openings.</span>
                     </div>
                     <div className="text-right">
                       <span className="text-xl font-black text-indigo-700 font-mono">
-                        ₹{grandEarned.toLocaleString('en-IN')}
+                        {projectTowerSummaries.reduce((sum, t) => sum + t.completedDoors, 0)} / {projectTowerSummaries.reduce((sum, t) => sum + t.totalDoors, 0)}
                       </span>
+                      <span className="text-xs font-bold text-zinc-400 ml-1.5">OPENINGS COMPLETED</span>
                     </div>
                   </div>
 
@@ -1449,10 +1523,10 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                       </div>
                       <div className="space-y-1">
                         <span className="text-[10px] font-extrabold tracking-wider bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full uppercase font-mono border border-amber-200">
-                          EXECUTIVE SUMMARY CONTRACT
+                          EXECUTIVE SUMMARY COMPLIANCE
                         </span>
                         <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
-                          PROJECT MASTER PAYMENT CLEARANCE CERTIFICATE
+                          PROJECT MASTER QUALITY COMPLIANCE CERTIFICATE
                         </h2>
                       </div>
                     </div>
@@ -1487,16 +1561,20 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl space-y-1">
-                      <span className="block text-[10px] text-zinc-400 font-bold uppercase">Contract Value (INR)</span>
-                      <span className="text-lg font-black text-zinc-900 font-mono">₹{grandBudget.toLocaleString('en-IN')}</span>
+                      <span className="block text-[10px] text-zinc-400 font-bold uppercase">Total Mapped Openings</span>
+                      <span className="text-lg font-black text-zinc-900 font-mono">{flats.length} Openings</span>
                     </div>
                     <div className="p-4 bg-emerald-50 border border-emerald-150 rounded-xl space-y-1">
-                      <span className="block text-[10px] text-emerald-800 font-black uppercase">Certified Earned (INR)</span>
-                      <span className="text-lg font-black text-emerald-700 font-mono">₹{grandEarned.toLocaleString('en-IN')}</span>
+                      <span className="block text-[10px] text-emerald-800 font-black uppercase">Completed &amp; Handed Over</span>
+                      <span className="text-lg font-black text-emerald-700 font-mono">
+                        {flats.filter(f => getFlatOverallProgress(f) === 100).length} Openings
+                      </span>
                     </div>
-                    <div className="p-4 bg-rose-50 border border-rose-150 rounded-xl space-y-1">
-                      <span className="block text-[10px] text-rose-800 font-black uppercase">Balance Outstanding (INR)</span>
-                      <span className="text-lg font-black text-rose-700 font-mono">₹{(grandBudget - grandEarned).toLocaleString('en-IN')}</span>
+                    <div className="p-4 bg-amber-50 border border-amber-150 rounded-xl space-y-1">
+                      <span className="block text-[10px] text-amber-800 font-black uppercase">In Progress / Outstanding</span>
+                      <span className="text-lg font-black text-amber-700 font-mono">
+                        {flats.filter(f => getFlatOverallProgress(f) < 100).length} Openings
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1504,12 +1582,12 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 <div className="space-y-6 pt-6 border-t border-zinc-200">
                   <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl flex items-center justify-between">
                     <div>
-                      <span className="block text-[9px] text-amber-850 font-black uppercase tracking-wider font-mono">MASTER PROJECT FINANCIAL COMPLETION RATE</span>
-                      <span className="text-xs text-zinc-500 font-medium">Calculated as the certified value divided by total contractual budget.</span>
+                      <span className="block text-[9px] text-amber-850 font-black uppercase tracking-wider font-mono">MASTER PROJECT COMPLIANCE RATE</span>
+                      <span className="text-xs text-zinc-500 font-medium">Calculated as completed door installations divided by total contractual openings.</span>
                     </div>
                     <div className="text-right">
                       <span className="text-2xl font-black text-amber-650 font-mono">
-                        {grandFinancialProgress}%
+                        {Math.round((flats.filter(f => getFlatOverallProgress(f) === 100).length / flats.length) * 100)}%
                       </span>
                     </div>
                   </div>
@@ -1683,6 +1761,296 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 </div>
               </div>
             )}
+
+            {/* HANDING OVER COMPREHENSIVE CERTIFICATE LAYOUT */}
+            {certType === 'handover' && handoverMode === 'certificate' && (
+              <div className="bg-white rounded-3xl border border-zinc-300 shadow-lg p-8 sm:p-10 max-w-4xl mx-auto space-y-8 relative overflow-hidden flex flex-col justify-between min-h-[850px]">
+                <div className="space-y-6">
+                  {/* Certificate Heading Board */}
+                  <div className="border-b-4 border-indigo-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-13 h-13 shrink-0">
+                        <TufwudLogoTransparent className="w-full h-full" />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-850 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
+                          FINAL HANDING OVER PROTOCOL
+                        </span>
+                        <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
+                          QUALITY HANDING OVER &amp; TAKE OVER CERTIFICATE
+                        </h2>
+                      </div>
+                    </div>
+                    <div className="text-right font-mono text-xs text-zinc-550 space-y-0.5 font-bold shrink-0">
+                      <div>Cert No: HC-{flats[0]?.oaNo || '387026'}-FINAL</div>
+                      <div>Date: {new Date().toLocaleDateString()}</div>
+                      <div className="text-indigo-600 font-extrabold font-mono">Quality Handover Docket</div>
+                    </div>
+                  </div>
+
+                  {/* Formal Declaration Block */}
+                  <div className="p-5 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-3">
+                    <h3 className="font-bold text-xs uppercase tracking-wide text-zinc-800">Formal Transfer Declaration</h3>
+                    <p className="text-xs text-zinc-600 leading-relaxed font-semibold">
+                      We hereby declare and certify that the door sets and specifications listed below have undergone final de-snagging, rigorous alignment checks, and paint touch-ups. All keys are accounted for, hardware components are polished, and the openings are formally handed over to the Client in perfect working order.
+                    </p>
+                  </div>
+
+                  {/* Project Parameters */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold">
+                    <div className="space-y-0.5">
+                      <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Project / Sales Order</span>
+                      <span className="text-zinc-850 font-extrabold">{flats[0]?.oaNo || 'SO-387026'}</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Client Spec</span>
+                      <span className="text-zinc-850 font-extrabold">{flats[0]?.soDetails || 'Godrej Woods'}</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Site Supervisor</span>
+                      <span className="text-zinc-800 font-bold">{flats[0]?.supervisor || 'Aarif Taslim'}</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Assigned Contractor</span>
+                      <span className="text-zinc-800 font-bold">{flats[0]?.contractor || 'Prabir Dhol'}</span>
+                    </div>
+                  </div>
+
+                  {/* Mapped Openings Table */}
+                  <div className="border border-zinc-250 rounded-xl overflow-hidden shadow-2xs">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-zinc-100 text-zinc-650 font-black uppercase border-b border-zinc-250 text-[10px] tracking-wider font-mono">
+                          <th className="px-5 py-3 w-1/3">Opening ID &amp; Location</th>
+                          <th className="px-5 py-3 w-5/12">Key &amp; Hardware Status</th>
+                          <th className="px-5 py-3 text-center w-1/4">Handover Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200 font-semibold text-zinc-700">
+                        {flats
+                          .filter(d => {
+                            if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
+                            if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
+                            return true;
+                          })
+                          .slice(0, 8) // Limit to 8 rows for visual aesthetic print page-limit
+                          .map(door => {
+                            const progress = getFlatOverallProgress(door);
+                            return (
+                              <tr key={door.id} className="hover:bg-zinc-50/20 transition">
+                                <td className="px-5 py-4 font-mono">
+                                  <div className="font-bold text-zinc-950 text-[11px] truncate">{door.id.split('/').pop()}</div>
+                                  <div className="text-[10px] text-zinc-450 mt-0.5 font-sans">{door.towerId} | Level {door.floor} | Flat {door.flatNo}</div>
+                                </td>
+                                <td className="px-5 py-4">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {door.handover.keysHandover ? (
+                                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-100 text-[9px] rounded font-bold uppercase">Keys Handed Over</span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 bg-zinc-50 text-zinc-450 border border-zinc-150 text-[9px] rounded font-bold uppercase">Keys Pending</span>
+                                    )}
+                                    {door.hardwareFixing.hingeFitting && door.hardwareFixing.lockWithHandleFitting ? (
+                                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-100 text-[9px] rounded font-bold uppercase">Hardware Mapped</span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 bg-zinc-50 text-zinc-440 border border-zinc-150 text-[9px] rounded font-bold uppercase">Hardware Open</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-5 py-4 text-center">
+                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider font-mono ${
+                                    progress === 100 
+                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                      : "bg-amber-100 text-amber-800 border border-amber-200"
+                                  }`}>
+                                    {progress === 100 ? "Ready & Handed Over" : "In Handover Audit"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        {flats.filter(d => {
+                          if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
+                          if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
+                          return true;
+                        }).length === 0 && (
+                          <tr>
+                            <td colSpan={3} className="px-5 py-8 text-center text-zinc-450 italic font-medium bg-zinc-50">
+                              No matching openings found in the selected scope filter.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Footer Signature Docket */}
+                <div className="space-y-6 pt-6 border-t border-zinc-200">
+                  <div className="grid grid-cols-3 gap-6 pt-4 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-450 font-mono">
+                    <div className="space-y-12">
+                      <div className="border-b border-zinc-300 mx-auto w-3/4" />
+                      <div>HANDED OVER BY (Tufwud Site Supervisor)</div>
+                    </div>
+                    <div className="space-y-12">
+                      <div className="border-b border-zinc-300 mx-auto w-3/4" />
+                      <div>VERIFIED BY (Tufwud Lead QA Auditor)</div>
+                    </div>
+                    <div className="space-y-12">
+                      <div className="border-b border-zinc-300 mx-auto w-3/4 text-indigo-300" />
+                      <div className="text-indigo-600 font-extrabold">TAKEN OVER BY (Authorized Client Representative)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* HANDING OVER FORMAL LETTER LAYOUT */}
+            {certType === 'handover' && handoverMode === 'letter' && (() => {
+              // Group flats by floor or tower-floor
+              const floorsGrouped: { [key: string]: { total: number; installed: number; handedOver: number } } = {};
+              flats
+                .filter(d => {
+                  if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
+                  if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
+                  return true;
+                })
+                .forEach(door => {
+                  const key = selectedCertTower === 'All' ? `${door.towerId} - Level ${door.floor}` : `Level ${door.floor}`;
+                  if (!floorsGrouped[key]) {
+                    floorsGrouped[key] = { total: 0, installed: 0, handedOver: 0 };
+                  }
+                  const isInstalled = getFlatOverallProgress(door) >= 100;
+                  const isKeysHandedOver = getSubtaskWeight(door.handover.keysHandover) === 1.0;
+                  floorsGrouped[key].total += 1;
+                  if (isInstalled) {
+                    floorsGrouped[key].installed += 1;
+                  }
+                  if (isInstalled && isKeysHandedOver) {
+                    floorsGrouped[key].handedOver += 1;
+                  }
+                });
+
+              let totalDoorsCount = 0;
+              let totalInstalledCount = 0;
+              let totalHandedOverCount = 0;
+              Object.values(floorsGrouped).forEach(g => {
+                totalDoorsCount += g.total;
+                totalInstalledCount += g.installed;
+                totalHandedOverCount += g.handedOver;
+              });
+              const totalHandoverPct = totalDoorsCount > 0 ? Math.round((totalHandedOverCount / totalDoorsCount) * 100) : 0;
+              const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+              return (
+                <div className="bg-white rounded-3xl border border-zinc-300 shadow-lg p-8 sm:p-12 max-w-4xl mx-auto space-y-8 relative overflow-hidden flex flex-col justify-between min-h-[850px] text-zinc-800 font-sans">
+                  <div className="space-y-6">
+                    {/* Brand Header */}
+                    <div className="text-center border-b-2 border-[#8a5a37] pb-4">
+                      <div className="text-2xl font-black text-[#6b4226] tracking-wide font-sans">
+                        TUFWUD DOORS &amp; ACCESSORIES PVT. LTD.
+                      </div>
+                      <div className="text-[11px] font-extrabold text-zinc-550 tracking-widest uppercase mt-1">
+                        Site Installation — Handover Letter
+                      </div>
+                    </div>
+
+                    {/* Metadata block */}
+                    <div className="flex justify-between items-start text-xs font-semibold text-zinc-650 pt-2 font-mono">
+                      <div>Date: {todayStr}</div>
+                      <div>Order No: {flats[0]?.oaNo || 'SO-387026'}-FINAL</div>
+                    </div>
+
+                    {/* Recipient Address */}
+                    <div className="space-y-1.5 text-xs font-semibold pt-4 text-zinc-700">
+                      <div className="font-extrabold uppercase tracking-wide text-zinc-400 text-[10px]">To,</div>
+                      <div className="text-sm font-black text-zinc-900">{clientContactName || '_______________________'}</div>
+                      <div className="text-xs text-zinc-550 leading-relaxed max-w-md" style={{ whiteSpace: 'pre-wrap' }}>
+                        {siteAddress || '_______________________'}
+                      </div>
+                    </div>
+
+                    {/* Subject Line */}
+                    <div className="bg-zinc-50 border border-zinc-200/60 p-3.5 rounded-xl text-xs text-zinc-900 font-black">
+                      Subject: Handover of door installation work — Order No. {flats[0]?.oaNo || 'SO-387026'}
+                    </div>
+
+                    {/* Salutation and Letter Body */}
+                    <div className="space-y-3.5 text-xs text-zinc-650 leading-relaxed font-medium">
+                      <p>Dear Sir/Madam,</p>
+                      <p>
+                        This is to confirm the status of door, frame, architrave and hardware installation carried out under the
+                        above order, as recorded on site. As of <strong className="text-zinc-950 font-bold">{todayStr}</strong>, <strong className="text-[#8a5a37] font-extrabold">{totalHandedOverCount} of {totalDoorsCount} doors ({totalHandoverPct}%)</strong> have been
+                        installed, inspected and signed off for handover.
+                      </p>
+                    </div>
+
+                    {/* Floor Summary Table */}
+                    <div className="border border-zinc-250 rounded-xl overflow-hidden shadow-3xs mt-4">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-zinc-100 text-zinc-650 font-black uppercase border-b border-zinc-250 text-[10px] tracking-wider font-mono">
+                            <th className="px-5 py-3">Floor / Tower Location</th>
+                            <th className="px-5 py-3 text-center w-24">Total Doors</th>
+                            <th className="px-5 py-3 text-center w-24">Installed</th>
+                            <th className="px-5 py-3 text-center w-28">Handed Over</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200 font-semibold text-zinc-700">
+                          {Object.entries(floorsGrouped).map(([floorKey, counts]) => (
+                            <tr key={floorKey} className="hover:bg-zinc-50/20 transition">
+                              <td className="px-5 py-3.5 font-bold text-zinc-900">{floorKey}</td>
+                              <td className="px-5 py-3.5 text-center font-mono text-zinc-500">{counts.total}</td>
+                              <td className="px-5 py-3.5 text-center font-mono text-emerald-600">{counts.installed}</td>
+                              <td className="px-5 py-3.5 text-center font-mono text-indigo-650 font-bold bg-indigo-50/10">{counts.handedOver}</td>
+                            </tr>
+                          ))}
+                          {totalDoorsCount > 0 && (
+                            <tr className="bg-zinc-50 font-black text-zinc-900 border-t-2 border-zinc-250 font-mono text-[11px]">
+                              <td className="px-5 py-4">GRAND TOTAL</td>
+                              <td className="px-5 py-4 text-center">{totalDoorsCount}</td>
+                              <td className="px-5 py-4 text-center text-emerald-700">{totalInstalledCount}</td>
+                              <td className="px-5 py-4 text-center text-indigo-700 bg-indigo-50/20">{totalHandedOverCount} ({totalHandoverPct}%)</td>
+                            </tr>
+                          )}
+                          {totalDoorsCount === 0 && (
+                            <tr>
+                              <td colSpan={4} className="px-5 py-8 text-center text-zinc-450 italic bg-zinc-50 font-medium">
+                                No matching records found for floor grouping.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Verification Note */}
+                    <p className="text-[11px] text-zinc-500 italic leading-relaxed pt-2">
+                      We request you to kindly review the installed work and countersign below to confirm formal receipt and site handover.
+                    </p>
+                  </div>
+
+                  {/* Signatures Row */}
+                  <div className="space-y-6 pt-10 mt-10 border-t border-zinc-200">
+                    <div className="grid grid-cols-2 gap-10 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-450 font-mono">
+                      <div className="space-y-12">
+                        <div className="border-b border-zinc-350 mx-auto w-5/6" />
+                        <div className="text-zinc-550">
+                          For Tufwud Doors &amp; Accessories Pvt. Ltd.
+                          <span className="block text-[9px] text-zinc-400 font-medium tracking-normal mt-0.5 lowercase font-sans">name, signature &amp; date</span>
+                        </div>
+                      </div>
+                      <div className="space-y-12">
+                        <div className="border-b border-zinc-350 mx-auto w-5/6 text-indigo-300" />
+                        <div className="text-indigo-650 font-extrabold">
+                          Client / Authorized Site Representative
+                          <span className="block text-[9px] text-zinc-400 font-medium tracking-normal mt-0.5 lowercase font-sans">name, signature &amp; date</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
 

@@ -94,16 +94,7 @@ export default function BackgroundValuesTab({
   }, [supervisorList, supervisor]);
 
   // Specs & Master opening codes custom state
-  const [customDoorCodes, setCustomDoorCodes] = useState('A, B, C, D, E, F');
-  const [customGenericNames, setCustomGenericNames] = useState('Main Door (MD), Bedroom 1 (BR1), Bedroom 2 (BR2), Toilet 1 (T1), Toilet 2 (T2), Balcony');
-  const [useCustomCodes, setUseCustomCodes] = useState(true);
-
-  // Manual doors selected fallback 
-  const [selectedDoors, setSelectedDoors] = useState<string[]>([
-    "Main Door (MD)",
-    "Bedroom 1 (BR1)",
-    "Toilet 1 (T1)"
-  ]);
+  const [doorsPerFlatCount, setDoorsPerFlatCount] = useState<number>(8);
 
   // Configuration Sub Tab ('openings' | 'payment' | 'contractors' | 'supervisors' | 'erp_upload')
   const [configSubTab, setConfigSubTab] = useState<'openings' | 'payment' | 'contractors' | 'supervisors' | 'erp_upload'>('openings');
@@ -345,21 +336,10 @@ export default function BackgroundValuesTab({
 
   const towerBreakdown = getTowerBreakdown();
 
-  const handleToggleDoorSelection = (door: string) => {
-    if (selectedDoors.includes(door)) {
-      if (selectedDoors.length > 1) {
-        setSelectedDoors(selectedDoors.filter(d => d !== door));
-      }
-    } else {
-      setSelectedDoors([...selectedDoors, door]);
-    }
-  };
-
   // Live total calculation logic helper
   const getParsedDoorsList = () => {
-    return useCustomCodes 
-      ? customDoorCodes.split(',').map(item => item.trim().toUpperCase()).filter(Boolean)
-      : customGenericNames.split(',').map(item => item.trim()).filter(Boolean);
+    const codes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    return codes.slice(0, Math.min(10, Math.max(1, doorsPerFlatCount)));
   };
 
   const parsedDoors = getParsedDoorsList();
@@ -732,102 +712,45 @@ export default function BackgroundValuesTab({
                 {/* Select Doors/Openings codes to allocate */}
                 <div className="pt-3 border-t border-zinc-150 space-y-3">
                   <div className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <span className="block text-xs font-bold text-zinc-650 uppercase tracking-wide">
-                        Doors per Flat (Openings per Flat)
-                      </span>
-                      
-                      {/* Mode selector */}
-                      <div className="flex rounded-md bg-zinc-150 p-0.5 text-[9px] font-bold">
-                        <button
-                          type="button"
-                          onClick={() => setUseCustomCodes(true)}
-                          className={`px-1.5 py-0.5 rounded transition ${
-                            useCustomCodes 
-                              ? "bg-white shadow-2xs text-indigo-600" 
-                              : "text-zinc-500 hover:text-zinc-700"
-                          }`}
-                        >
-                          Codes A-F
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setUseCustomCodes(false)}
-                          className={`px-1.5 py-0.5 rounded transition ${
-                            !useCustomCodes 
-                              ? "bg-white shadow-2xs text-indigo-600" 
-                              : "text-zinc-500 hover:text-zinc-700"
-                          }`}
-                        >
-                          Generic Names
-                        </button>
-                      </div>
-                    </div>
+                    <span className="block text-xs font-bold text-zinc-650 uppercase tracking-wide">
+                      Doors per Flat (Openings per Flat)
+                    </span>
                     <p className="text-[10px] text-zinc-500 font-medium leading-relaxed">
-                      Select or type the openings to create for each flat. The total number of items here determines the <span className="font-bold text-zinc-700">Doors per Flat multiplier</span>.
+                      Enter the total number of doors/openings to create for each flat. This value sets the checklist multiplier.
                     </p>
                   </div>
 
-                  {useCustomCodes ? (
-                    <div className="space-y-2">
-                      <p className="text-[10px] text-zinc-400 font-semibold">
-                        Comma-separated opening codes (e.g. A, B, C, D represents 4 doors per flat):
-                      </p>
-                      <input
-                        type="text"
-                        value={customDoorCodes}
-                        onChange={(e) => setCustomDoorCodes(e.target.value)}
-                        placeholder="e.g. A, B, C, D"
-                        className="w-full px-3 py-2 bg-white border border-zinc-250 rounded-xl text-xs font-bold font-mono text-indigo-700 focus:outline-none focus:border-indigo-500"
-                      />
+                  <div className="space-y-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={doorsPerFlatCount}
+                      onChange={(e) => setDoorsPerFlatCount(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
+                      className="w-full px-3.5 py-2.5 bg-white border border-zinc-250 rounded-xl text-xs font-bold text-indigo-700 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                      placeholder="e.g. 8"
+                    />
 
-                      {/* Map preview */}
-                      <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200/60 divide-y divide-zinc-200/50 text-xs text-zinc-650 space-y-1">
-                        {parsedDoors.map((code) => {
-                          const nameMapping = DOOR_MAP[code] || code;
-                          const standardPrice = doorPrices[code] ?? 5000;
-                          return (
-                            <div key={code} className="flex justify-between items-center py-1 text-[11px]">
-                              <span className="font-mono font-bold text-indigo-600">{code}</span>
-                              <span className="truncate max-w-[130px] font-medium text-zinc-600">{nameMapping}</span>
-                              <span className="font-mono text-zinc-500">₹{standardPrice.toLocaleString()}</span>
+                    {/* Map preview */}
+                    <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200/60 divide-y divide-zinc-200/50 text-xs text-zinc-650 space-y-1">
+                      {parsedDoors.map((code) => {
+                        const nameMapping = doorNames[code] || DOOR_MAP[code] || `Opening ${code}`;
+                        const standardPrice = doorPrices[code] ?? 5000;
+                        return (
+                          <div key={code} className="flex justify-between items-center py-1 text-[11px]">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-indigo-600">Code {code}</span>
+                              {nameMapping === "NA" && (
+                                <span className="text-[9px] px-1 bg-zinc-100 text-zinc-400 rounded">Extra</span>
+                              )}
                             </div>
-                          );
-                        })}
-                      </div>
+                            <span className="truncate max-w-[150px] font-semibold text-zinc-700">{nameMapping}</span>
+                            <span className="font-mono text-zinc-500">₹{standardPrice.toLocaleString()}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-[10px] text-zinc-400 font-semibold">
-                        Comma-separated opening names (e.g. Main Door, Bedroom 1, Toilet):
-                      </p>
-                      <input
-                        type="text"
-                        value={customGenericNames}
-                        onChange={(e) => setCustomGenericNames(e.target.value)}
-                        placeholder="e.g. Main Door, Bedroom 1, Toilet"
-                        className="w-full px-3 py-2 bg-white border border-zinc-250 rounded-xl text-xs font-semibold text-zinc-800 focus:outline-none focus:border-indigo-500"
-                      />
-
-                      {/* Map preview */}
-                      <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200/60 divide-y divide-zinc-200/50 text-xs text-zinc-650 space-y-1 max-h-40 overflow-y-auto">
-                        {parsedDoors.map((name, idx) => {
-                          let matchedCode = Object.keys(doorNames).find(code => doorNames[code] === name);
-                          if (!matchedCode) {
-                            matchedCode = Object.keys(DOOR_MAP).find(code => DOOR_MAP[code] === name);
-                          }
-                          const standardPrice = (matchedCode ? doorPrices[matchedCode] : undefined) ?? doorPrices[name] ?? 5000;
-                          return (
-                            <div key={idx} className="flex justify-between items-center py-1 text-[11px]">
-                              <span className="font-mono font-bold text-zinc-400">#{idx + 1}</span>
-                              <span className="truncate max-w-[150px] font-semibold text-zinc-700">{name}</span>
-                              <span className="font-mono text-zinc-500 font-medium">₹{standardPrice.toLocaleString()}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Calculation breakdown: Live multiplying multiplier values */}
@@ -848,13 +771,22 @@ export default function BackgroundValuesTab({
                 </div>
 
                 {/* Save initialization actions */}
-                <div className="flex gap-2.5 pt-2">
+                <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
                   <button
                     type="submit"
                     className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold transition shadow-md active:scale-98 cursor-pointer tracking-wider uppercase text-center flex items-center justify-center gap-1"
                   >
                     <Plus className="w-4 h-4" />
                     Initialize Project Map
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpdateMasterPrices}
+                    className="flex-1 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-extrabold transition shadow-md active:scale-98 cursor-pointer tracking-wider uppercase text-center flex items-center justify-center gap-1"
+                    title="Overwrite door specifications and prices across existing project records"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    Overwrite Presets
                   </button>
                 </div>
               </form>

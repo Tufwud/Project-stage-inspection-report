@@ -62,10 +62,10 @@ export default function App() {
       D: "Toilet 1 (T1)",
       E: "Toilet 2 (T2)",
       F: "Balcony",
-      G: "Toilet 3 (T3)",
-      H: "Kitchen",
-      I: "Store Room",
-      J: "Utility Door"
+      G: "NA",
+      H: "NA",
+      I: "NA",
+      J: "NA"
     };
   });
 
@@ -159,11 +159,12 @@ export default function App() {
 
           config.doorTypesToGenerate.forEach(doorCodeOrName => {
             // CONVERT CODE TO NAME (Lookup in doorNames then fallbacks)
-            const realName = doorNames[doorCodeOrName] || DOOR_MAP[doorCodeOrName] || doorCodeOrName;
+            let realName = doorNames[doorCodeOrName] || DOOR_MAP[doorCodeOrName] || doorCodeOrName;
 
             const normName = realName.trim().toUpperCase();
             if (!realName.trim() || normName === 'NA' || normName === 'N/A' || normName === 'NOT APPLICABLE') {
-              return; // Skip generating N/A or empty door specifications
+              // Skip generating this unassigned/disabled opening code
+              return;
             }
 
             // Retrieve the spec cost mapped to this opening code
@@ -815,6 +816,7 @@ export default function App() {
               selectedMilestoneFilter={selectedMilestone}
               onClearGridFilters={handleClearGridFilters}
               onBulkApproveFlat={handleBulkApproveFlat}
+              onUpdateFlats={saveFlats}
             />
 
             {/* Stage 5: CSV Synchronization Operations */}
