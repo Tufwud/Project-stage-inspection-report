@@ -250,8 +250,8 @@ export default function BackgroundValuesTab({
       newFlat.frameFixing = { ...flat.frameFixing };
       newFlat.doorFixing = { ...flat.doorFixing };
       newFlat.hardwareFixing = { ...flat.hardwareFixing };
-      newFlat.painting = { ...flat.painting };
-      newFlat.handover = { ...flat.handover };
+      newFlat.painting = flat.painting ? { ...flat.painting } : { frameCarpatchFillingSanding: 'not_started', frameTouchUp: 'not_started', shutterEdgeFinishing: 'not_started', lockSlotAreaFinishing: 'not_started', shutterTouchUp: 'not_started', timestamp: "", contractor: "", doneBy: "" };
+      newFlat.handover = flat.handover ? { ...flat.handover } : { hardwareCleaning: 'not_started', plasticCoverRemoval: 'not_started', keysHandover: 'not_started', timestamp: "", contractor: "", doneBy: "" };
 
       // Find rules that apply to this flat's tower and stage
       contractorRules.forEach(rule => {
@@ -771,22 +771,13 @@ export default function BackgroundValuesTab({
                 </div>
 
                 {/* Save initialization actions */}
-                <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <div className="pt-2">
                   <button
                     type="submit"
-                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold transition shadow-md active:scale-98 cursor-pointer tracking-wider uppercase text-center flex items-center justify-center gap-1"
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold transition shadow-md active:scale-98 cursor-pointer tracking-wider uppercase text-center flex items-center justify-center gap-1"
                   >
                     <Plus className="w-4 h-4" />
                     Initialize Project Map
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleUpdateMasterPrices}
-                    className="flex-1 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-extrabold transition shadow-md active:scale-98 cursor-pointer tracking-wider uppercase text-center flex items-center justify-center gap-1"
-                    title="Overwrite door specifications and prices across existing project records"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    Overwrite Presets
                   </button>
                 </div>
               </form>
@@ -1601,7 +1592,7 @@ export default function BackgroundValuesTab({
             </div>
             <div>
               <h3 className="font-extrabold text-base text-zinc-905 tracking-tight">Supervisor Active Project Map</h3>
-              <p className="text-xs text-zinc-500 font-semibold font-sans">Active segments, registered PO indices, and structure controls.</p>
+              <p className="text-xs text-zinc-500 font-semibold font-sans">Active segments, registered OA indices, and structure controls.</p>
             </div>
           </div>
 
@@ -1666,7 +1657,7 @@ export default function BackgroundValuesTab({
 
                       <div className="grid grid-cols-2 gap-2 text-xs pt-1.5 border-t border-zinc-200/50">
                         <div>
-                          <span className="block text-[9px] text-zinc-450 font-bold uppercase tracking-wider leading-none">Registered PO</span>
+                          <span className="block text-[9px] text-zinc-450 font-bold uppercase tracking-wider leading-none">Registered OA No.</span>
                           <span className="font-mono font-bold text-zinc-700 text-[11px]">
                             {item.oaCodes.length > 0 ? item.oaCodes.join(", ") : "None"}
                           </span>

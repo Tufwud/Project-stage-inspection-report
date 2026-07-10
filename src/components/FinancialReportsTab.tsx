@@ -37,8 +37,8 @@ type SortField = 'id' | 'flatNo' | 'price' | 'earned' | 'progress';
 type SortOrder = 'asc' | 'desc';
 
 export default function FinancialReportsTab({ flats }: FinancialReportsTabProps) {
-  // Main Tab Control: 'summaries' | 'ledger' | 'certificates' | 'runningBills'
-  const [activeTab, setActiveTab] = useState<'summaries' | 'ledger' | 'certificates' | 'runningBills'>('summaries');
+  // Main Tab Control: 'summaries' | 'ledger' | 'certificates' | 'runningBills' | 'handoverTab'
+  const [activeTab, setActiveTab] = useState<'summaries' | 'ledger' | 'certificates' | 'runningBills' | 'handoverTab'>('summaries');
 
   // State for Report A (Detailed Door List Ledger) Filtering and Sorting
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,6 +62,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
   const [handoverMode, setHandoverMode] = useState<'certificate' | 'letter'>('certificate');
   const [clientContactName, setClientContactName] = useState('Rahatul Hoque');
   const [siteAddress, setSiteAddress] = useState('Godrej Woods, Sector 43, Noida, UP');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Running Bill Specific States
   const [selectedBillMonth, setSelectedBillMonth] = useState('All');
@@ -86,6 +87,139 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
   const uniqueTowers = Array.from(new Set(flats.map(f => f.towerId))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   const uniqueFloors = Array.from(new Set(flats.map(f => f.floor))).sort((a, b) => a - b);
   const uniqueContractors = Array.from(new Set(flats.map(f => f.contractor || f.frameFixing?.contractor || 'Prabir Dhol'))).filter(Boolean).sort();
+
+  // --- HANDOVER DOWNLOAD OPTIONS ---
+  const downloadAsPDF = () => {
+    const element = document.querySelector('.printable-cert-deck');
+    if (!element) return;
+
+    setIsGeneratingPdf(true);
+
+    const proceedWithPdf = () => {
+      const opt = {
+        margin:       [0.3, 0.3, 0.3, 0.3], // top, left, bottom, right in inches
+        filename:     `Tufwud_Handover_${handoverMode === 'certificate' ? 'Certificate' : 'Letter'}_${flats[0]?.oaNo || 'SO'}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+      };
+
+      (window as any).html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(() => {
+          setIsGeneratingPdf(false);
+        })
+        .catch((err: any) => {
+          console.error('PDF Generation Error:', err);
+          setIsGeneratingPdf(false);
+          alert('Could not download PDF. Please try again or use "Print / Save as PDF" instead.');
+        });
+    };
+
+    if (typeof (window as any).html2pdf === 'function') {
+      proceedWithPdf();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      script.integrity = 'sha512-GsLlZN/3F2ErC5IfS51RCYfSPv1UcKQNmyGsZEG92IHOzKZoY749YBDIpPhUF1JYII400CS7UMyTXgAtIa9laA==';
+      script.crossOrigin = 'anonymous';
+      script.referrerPolicy = 'no-referrer';
+      script.onload = () => {
+        proceedWithPdf();
+      };
+      script.onerror = () => {
+        setIsGeneratingPdf(false);
+        alert('Could not load PDF library. Please make sure you are connected to the internet, or use the "Print / Save as PDF" option.');
+      };
+      document.body.appendChild(script);
+    }
+  };
+
+  const downloadAsHTML = () => {
+    const element = document.querySelector('.printable-cert-deck');
+    if (!element) return;
+    
+    const styledHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tufwud Handover - ${handoverMode === 'certificate' ? 'Certificate' : 'Letter'}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f4f4f5;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    @media print {
+      body {
+        background-color: white;
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div style="width: 100%; max-width: 56rem;">
+    ${element.innerHTML}
+  </div>
+</body>
+</html>
+    `;
+    
+    const blob = new Blob([styledHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tufwud_Handover_${handoverMode === 'certificate' ? 'Certificate' : 'Letter'}_${flats[0]?.oaNo || 'SO'}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAsCSV = () => {
+    const filtered = flats.filter(d => {
+      if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
+      if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
+      return true;
+    });
+
+    const headers = ['Opening ID', 'Tower', 'Floor', 'Flat No', 'Contractor', 'Supervisor', 'Keys Handover Status', 'Hardware Quality Status', 'Overall Quality Progress %'];
+    const rows = filtered.map(d => [
+      d.id.split('/').pop() || d.id,
+      d.towerId,
+      d.floor,
+      d.flatNo,
+      d.contractor || 'N/A',
+      d.supervisor || 'N/A',
+      d.handover.keysHandover ? 'Handed Over' : 'Pending',
+      (d.hardwareFixing.hingeFitting && d.hardwareFixing.lockWithHandleFitting) ? 'Completed' : 'Pending',
+      `${getFlatOverallProgress(d)}%`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tufwud_Handover_Summary_${flats[0]?.oaNo || 'SO'}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   // --- RA BILL HELPER FUNCTIONS ---
   const getStageTimestamp = (f: FlatRecord, stageId: string): string => {
@@ -673,6 +807,18 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
             <Calendar className="w-3.5 h-3.5 text-purple-500" />
             <span>Running Bills</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('handoverTab')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition ${
+              activeTab === 'handoverTab' 
+                ? 'bg-white text-indigo-950 shadow-xs border border-indigo-200/50' 
+                : 'text-zinc-550 hover:bg-zinc-200/50'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Handover Certificate</span>
+          </button>
         </div>
         
         <div className="text-[10px] font-bold text-zinc-400 font-mono tracking-wider px-3 select-none text-right">
@@ -1111,12 +1257,6 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                   >
                     R.A. Bill
                   </button>
-                  <button
-                    onClick={() => setCertType('handover')}
-                    className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition uppercase ${certType === 'handover' ? 'bg-white text-indigo-700 shadow-3xs border border-zinc-200/50' : 'text-zinc-500'}`}
-                  >
-                    Handing Over
-                  </button>
                 </div>
               </div>
 
@@ -1169,75 +1309,15 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                     </div>
                   </div>
                 </>
-              ) : certType === 'handover' ? (
-                <>
-                  {/* Selector 3: Handover Format toggle */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide font-mono">Handover Format</label>
-                    <div className="flex bg-zinc-100 rounded-xl p-1 border border-zinc-200">
-                      <button
-                        onClick={() => setHandoverMode('certificate')}
-                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition uppercase ${handoverMode === 'certificate' ? 'bg-white text-indigo-700 shadow-3xs border border-zinc-200/50' : 'text-zinc-500'}`}
-                      >
-                        Certificate
-                      </button>
-                      <button
-                        onClick={() => setHandoverMode('letter')}
-                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition uppercase ${handoverMode === 'letter' ? 'bg-white text-indigo-700 shadow-3xs border border-zinc-200/50' : 'text-zinc-500'}`}
-                      >
-                        Handover Letter
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Selector 4: Select Contractor */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Select Contractor</label>
-                    <select
-                      value={selectedCertContractor}
-                      onChange={(e) => setSelectedCertContractor(e.target.value)}
-                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-250 rounded-xl text-xs font-bold text-zinc-700"
-                    >
-                      <option value="All">All Contractors</option>
-                      {uniqueContractors.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                </>
               ) : (
                 <div className="sm:col-span-2 md:col-span-1 space-y-1.5 flex flex-col justify-end">
                   <div className="p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] text-zinc-500 font-medium">
-                    💡 Meets <strong>4 columns</strong> & <strong>5 doors per page</strong> standards. Includes automatic bottom totals, supervisor validation, and contractor signatories.
+                    💡 Meets <strong>4 columns</strong> &amp; <strong>5 doors per page</strong> standards. Includes automatic bottom totals, supervisor validation, and contractor signatories.
                   </div>
                 </div>
               )}
 
             </div>
-
-            {/* Extra inputs row for Handover Letter parameters */}
-            {certType === 'handover' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-zinc-150 pt-4 animate-fadeIn">
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Client / Site Contact Name</label>
-                  <input
-                    type="text"
-                    value={clientContactName}
-                    onChange={(e) => setClientContactName(e.target.value)}
-                    placeholder="e.g. Rahatul Hoque"
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Site Address</label>
-                  <input
-                    type="text"
-                    value={siteAddress}
-                    onChange={(e) => setSiteAddress(e.target.value)}
-                    placeholder="e.g. Godrej Woods, Sector 43, Noida, UP"
-                    className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
-                  />
-                </div>
-              </div>
-            )}
 
           </div>
 
@@ -1762,296 +1842,6 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
               </div>
             )}
 
-            {/* HANDING OVER COMPREHENSIVE CERTIFICATE LAYOUT */}
-            {certType === 'handover' && handoverMode === 'certificate' && (
-              <div className="bg-white rounded-3xl border border-zinc-300 shadow-lg p-8 sm:p-10 max-w-4xl mx-auto space-y-8 relative overflow-hidden flex flex-col justify-between min-h-[850px]">
-                <div className="space-y-6">
-                  {/* Certificate Heading Board */}
-                  <div className="border-b-4 border-indigo-600 pb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-13 h-13 shrink-0">
-                        <TufwudLogoTransparent className="w-full h-full" />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-850 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
-                          FINAL HANDING OVER PROTOCOL
-                        </span>
-                        <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
-                          QUALITY HANDING OVER &amp; TAKE OVER CERTIFICATE
-                        </h2>
-                      </div>
-                    </div>
-                    <div className="text-right font-mono text-xs text-zinc-550 space-y-0.5 font-bold shrink-0">
-                      <div>Cert No: HC-{flats[0]?.oaNo || '387026'}-FINAL</div>
-                      <div>Date: {new Date().toLocaleDateString()}</div>
-                      <div className="text-indigo-600 font-extrabold font-mono">Quality Handover Docket</div>
-                    </div>
-                  </div>
-
-                  {/* Formal Declaration Block */}
-                  <div className="p-5 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-3">
-                    <h3 className="font-bold text-xs uppercase tracking-wide text-zinc-800">Formal Transfer Declaration</h3>
-                    <p className="text-xs text-zinc-600 leading-relaxed font-semibold">
-                      We hereby declare and certify that the door sets and specifications listed below have undergone final de-snagging, rigorous alignment checks, and paint touch-ups. All keys are accounted for, hardware components are polished, and the openings are formally handed over to the Client in perfect working order.
-                    </p>
-                  </div>
-
-                  {/* Project Parameters */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold">
-                    <div className="space-y-0.5">
-                      <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Project / Sales Order</span>
-                      <span className="text-zinc-850 font-extrabold">{flats[0]?.oaNo || 'SO-387026'}</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Client Spec</span>
-                      <span className="text-zinc-850 font-extrabold">{flats[0]?.soDetails || 'Godrej Woods'}</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Site Supervisor</span>
-                      <span className="text-zinc-800 font-bold">{flats[0]?.supervisor || 'Aarif Taslim'}</span>
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Assigned Contractor</span>
-                      <span className="text-zinc-800 font-bold">{flats[0]?.contractor || 'Prabir Dhol'}</span>
-                    </div>
-                  </div>
-
-                  {/* Mapped Openings Table */}
-                  <div className="border border-zinc-250 rounded-xl overflow-hidden shadow-2xs">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-zinc-100 text-zinc-650 font-black uppercase border-b border-zinc-250 text-[10px] tracking-wider font-mono">
-                          <th className="px-5 py-3 w-1/3">Opening ID &amp; Location</th>
-                          <th className="px-5 py-3 w-5/12">Key &amp; Hardware Status</th>
-                          <th className="px-5 py-3 text-center w-1/4">Handover Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200 font-semibold text-zinc-700">
-                        {flats
-                          .filter(d => {
-                            if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
-                            if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
-                            return true;
-                          })
-                          .slice(0, 8) // Limit to 8 rows for visual aesthetic print page-limit
-                          .map(door => {
-                            const progress = getFlatOverallProgress(door);
-                            return (
-                              <tr key={door.id} className="hover:bg-zinc-50/20 transition">
-                                <td className="px-5 py-4 font-mono">
-                                  <div className="font-bold text-zinc-950 text-[11px] truncate">{door.id.split('/').pop()}</div>
-                                  <div className="text-[10px] text-zinc-450 mt-0.5 font-sans">{door.towerId} | Level {door.floor} | Flat {door.flatNo}</div>
-                                </td>
-                                <td className="px-5 py-4">
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {door.handover.keysHandover ? (
-                                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-100 text-[9px] rounded font-bold uppercase">Keys Handed Over</span>
-                                    ) : (
-                                      <span className="px-2 py-0.5 bg-zinc-50 text-zinc-450 border border-zinc-150 text-[9px] rounded font-bold uppercase">Keys Pending</span>
-                                    )}
-                                    {door.hardwareFixing.hingeFitting && door.hardwareFixing.lockWithHandleFitting ? (
-                                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-100 text-[9px] rounded font-bold uppercase">Hardware Mapped</span>
-                                    ) : (
-                                      <span className="px-2 py-0.5 bg-zinc-50 text-zinc-440 border border-zinc-150 text-[9px] rounded font-bold uppercase">Hardware Open</span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-5 py-4 text-center">
-                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider font-mono ${
-                                    progress === 100 
-                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                                      : "bg-amber-100 text-amber-800 border border-amber-200"
-                                  }`}>
-                                    {progress === 100 ? "Ready & Handed Over" : "In Handover Audit"}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        {flats.filter(d => {
-                          if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
-                          if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
-                          return true;
-                        }).length === 0 && (
-                          <tr>
-                            <td colSpan={3} className="px-5 py-8 text-center text-zinc-450 italic font-medium bg-zinc-50">
-                              No matching openings found in the selected scope filter.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Footer Signature Docket */}
-                <div className="space-y-6 pt-6 border-t border-zinc-200">
-                  <div className="grid grid-cols-3 gap-6 pt-4 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-450 font-mono">
-                    <div className="space-y-12">
-                      <div className="border-b border-zinc-300 mx-auto w-3/4" />
-                      <div>HANDED OVER BY (Tufwud Site Supervisor)</div>
-                    </div>
-                    <div className="space-y-12">
-                      <div className="border-b border-zinc-300 mx-auto w-3/4" />
-                      <div>VERIFIED BY (Tufwud Lead QA Auditor)</div>
-                    </div>
-                    <div className="space-y-12">
-                      <div className="border-b border-zinc-300 mx-auto w-3/4 text-indigo-300" />
-                      <div className="text-indigo-600 font-extrabold">TAKEN OVER BY (Authorized Client Representative)</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* HANDING OVER FORMAL LETTER LAYOUT */}
-            {certType === 'handover' && handoverMode === 'letter' && (() => {
-              // Group flats by floor or tower-floor
-              const floorsGrouped: { [key: string]: { total: number; installed: number; handedOver: number } } = {};
-              flats
-                .filter(d => {
-                  if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
-                  if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
-                  return true;
-                })
-                .forEach(door => {
-                  const key = selectedCertTower === 'All' ? `${door.towerId} - Level ${door.floor}` : `Level ${door.floor}`;
-                  if (!floorsGrouped[key]) {
-                    floorsGrouped[key] = { total: 0, installed: 0, handedOver: 0 };
-                  }
-                  const isInstalled = getFlatOverallProgress(door) >= 100;
-                  const isKeysHandedOver = getSubtaskWeight(door.handover.keysHandover) === 1.0;
-                  floorsGrouped[key].total += 1;
-                  if (isInstalled) {
-                    floorsGrouped[key].installed += 1;
-                  }
-                  if (isInstalled && isKeysHandedOver) {
-                    floorsGrouped[key].handedOver += 1;
-                  }
-                });
-
-              let totalDoorsCount = 0;
-              let totalInstalledCount = 0;
-              let totalHandedOverCount = 0;
-              Object.values(floorsGrouped).forEach(g => {
-                totalDoorsCount += g.total;
-                totalInstalledCount += g.installed;
-                totalHandedOverCount += g.handedOver;
-              });
-              const totalHandoverPct = totalDoorsCount > 0 ? Math.round((totalHandedOverCount / totalDoorsCount) * 100) : 0;
-              const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-
-              return (
-                <div className="bg-white rounded-3xl border border-zinc-300 shadow-lg p-8 sm:p-12 max-w-4xl mx-auto space-y-8 relative overflow-hidden flex flex-col justify-between min-h-[850px] text-zinc-800 font-sans">
-                  <div className="space-y-6">
-                    {/* Brand Header */}
-                    <div className="text-center border-b-2 border-[#8a5a37] pb-4">
-                      <div className="text-2xl font-black text-[#6b4226] tracking-wide font-sans">
-                        TUFWUD DOORS &amp; ACCESSORIES PVT. LTD.
-                      </div>
-                      <div className="text-[11px] font-extrabold text-zinc-550 tracking-widest uppercase mt-1">
-                        Site Installation — Handover Letter
-                      </div>
-                    </div>
-
-                    {/* Metadata block */}
-                    <div className="flex justify-between items-start text-xs font-semibold text-zinc-650 pt-2 font-mono">
-                      <div>Date: {todayStr}</div>
-                      <div>Order No: {flats[0]?.oaNo || 'SO-387026'}-FINAL</div>
-                    </div>
-
-                    {/* Recipient Address */}
-                    <div className="space-y-1.5 text-xs font-semibold pt-4 text-zinc-700">
-                      <div className="font-extrabold uppercase tracking-wide text-zinc-400 text-[10px]">To,</div>
-                      <div className="text-sm font-black text-zinc-900">{clientContactName || '_______________________'}</div>
-                      <div className="text-xs text-zinc-550 leading-relaxed max-w-md" style={{ whiteSpace: 'pre-wrap' }}>
-                        {siteAddress || '_______________________'}
-                      </div>
-                    </div>
-
-                    {/* Subject Line */}
-                    <div className="bg-zinc-50 border border-zinc-200/60 p-3.5 rounded-xl text-xs text-zinc-900 font-black">
-                      Subject: Handover of door installation work — Order No. {flats[0]?.oaNo || 'SO-387026'}
-                    </div>
-
-                    {/* Salutation and Letter Body */}
-                    <div className="space-y-3.5 text-xs text-zinc-650 leading-relaxed font-medium">
-                      <p>Dear Sir/Madam,</p>
-                      <p>
-                        This is to confirm the status of door, frame, architrave and hardware installation carried out under the
-                        above order, as recorded on site. As of <strong className="text-zinc-950 font-bold">{todayStr}</strong>, <strong className="text-[#8a5a37] font-extrabold">{totalHandedOverCount} of {totalDoorsCount} doors ({totalHandoverPct}%)</strong> have been
-                        installed, inspected and signed off for handover.
-                      </p>
-                    </div>
-
-                    {/* Floor Summary Table */}
-                    <div className="border border-zinc-250 rounded-xl overflow-hidden shadow-3xs mt-4">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-zinc-100 text-zinc-650 font-black uppercase border-b border-zinc-250 text-[10px] tracking-wider font-mono">
-                            <th className="px-5 py-3">Floor / Tower Location</th>
-                            <th className="px-5 py-3 text-center w-24">Total Doors</th>
-                            <th className="px-5 py-3 text-center w-24">Installed</th>
-                            <th className="px-5 py-3 text-center w-28">Handed Over</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-200 font-semibold text-zinc-700">
-                          {Object.entries(floorsGrouped).map(([floorKey, counts]) => (
-                            <tr key={floorKey} className="hover:bg-zinc-50/20 transition">
-                              <td className="px-5 py-3.5 font-bold text-zinc-900">{floorKey}</td>
-                              <td className="px-5 py-3.5 text-center font-mono text-zinc-500">{counts.total}</td>
-                              <td className="px-5 py-3.5 text-center font-mono text-emerald-600">{counts.installed}</td>
-                              <td className="px-5 py-3.5 text-center font-mono text-indigo-650 font-bold bg-indigo-50/10">{counts.handedOver}</td>
-                            </tr>
-                          ))}
-                          {totalDoorsCount > 0 && (
-                            <tr className="bg-zinc-50 font-black text-zinc-900 border-t-2 border-zinc-250 font-mono text-[11px]">
-                              <td className="px-5 py-4">GRAND TOTAL</td>
-                              <td className="px-5 py-4 text-center">{totalDoorsCount}</td>
-                              <td className="px-5 py-4 text-center text-emerald-700">{totalInstalledCount}</td>
-                              <td className="px-5 py-4 text-center text-indigo-700 bg-indigo-50/20">{totalHandedOverCount} ({totalHandoverPct}%)</td>
-                            </tr>
-                          )}
-                          {totalDoorsCount === 0 && (
-                            <tr>
-                              <td colSpan={4} className="px-5 py-8 text-center text-zinc-450 italic bg-zinc-50 font-medium">
-                                No matching records found for floor grouping.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Verification Note */}
-                    <p className="text-[11px] text-zinc-500 italic leading-relaxed pt-2">
-                      We request you to kindly review the installed work and countersign below to confirm formal receipt and site handover.
-                    </p>
-                  </div>
-
-                  {/* Signatures Row */}
-                  <div className="space-y-6 pt-10 mt-10 border-t border-zinc-200">
-                    <div className="grid grid-cols-2 gap-10 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-450 font-mono">
-                      <div className="space-y-12">
-                        <div className="border-b border-zinc-350 mx-auto w-5/6" />
-                        <div className="text-zinc-550">
-                          For Tufwud Doors &amp; Accessories Pvt. Ltd.
-                          <span className="block text-[9px] text-zinc-400 font-medium tracking-normal mt-0.5 lowercase font-sans">name, signature &amp; date</span>
-                        </div>
-                      </div>
-                      <div className="space-y-12">
-                        <div className="border-b border-zinc-350 mx-auto w-5/6 text-indigo-300" />
-                        <div className="text-indigo-650 font-extrabold">
-                          Client / Authorized Site Representative
-                          <span className="block text-[9px] text-zinc-400 font-medium tracking-normal mt-0.5 lowercase font-sans">name, signature &amp; date</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
           </div>
 
         </div>
@@ -2167,6 +1957,499 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                   </div>
                 ))}
             </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* --- TAB VIEW 5: DEDICATED PROJECT HANDOVER TAB --- */}
+      {activeTab === 'handoverTab' && (
+        <div className="space-y-6 animate-fadeIn">
+          
+          {/* Handover Configuration Panel */}
+          <div className="no-print bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-0.5 flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
+                  <CheckCircle2 className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-indigo-650 font-black uppercase tracking-wider font-mono">HANDOVER MODULE</span>
+                  <h3 className="text-base font-extrabold text-zinc-900">Project Handover Documents</h3>
+                  <p className="text-xs text-zinc-500 font-medium">Generate official site handover quality certificates and formal handover letters.</p>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2.5 bg-indigo-650 hover:bg-indigo-750 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                  <span>Print / Save as PDF</span>
+                </button>
+
+                <button
+                  disabled={isGeneratingPdf}
+                  onClick={downloadAsPDF}
+                  className="px-4 py-2.5 bg-red-650 hover:bg-red-750 disabled:bg-zinc-400 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  {isGeneratingPdf ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span>Generating PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-3.5 h-3.5 shrink-0" />
+                      <span>Download PDF</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={downloadAsHTML}
+                  className="px-4 py-2.5 bg-emerald-650 hover:bg-emerald-750 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                  <span>Download HTML Doc</span>
+                </button>
+
+                <button
+                  onClick={downloadAsCSV}
+                  className="px-4 py-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-250 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 shrink-0 text-emerald-650" />
+                  <span>Export CSV Data</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-zinc-100">
+              
+              {/* Selector 1: Handover Mode */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide font-mono">Document Format</label>
+                <div className="flex bg-zinc-100 rounded-xl p-1 border border-zinc-200">
+                  <button
+                    onClick={() => setHandoverMode('certificate')}
+                    className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition uppercase ${handoverMode === 'certificate' ? 'bg-white text-indigo-700 shadow-3xs border border-zinc-200/50' : 'text-zinc-500'}`}
+                  >
+                    Certificate
+                  </button>
+                  <button
+                    onClick={() => setHandoverMode('letter')}
+                    className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition uppercase ${handoverMode === 'letter' ? 'bg-white text-indigo-700 shadow-3xs border border-zinc-200/50' : 'text-zinc-500'}`}
+                  >
+                    Formal Letter
+                  </button>
+                </div>
+              </div>
+
+              {/* Selector 2: Tower Location Filter */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Tower Location Filter</label>
+                <select
+                  value={selectedCertTower}
+                  onChange={(e) => setSelectedCertTower(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-250 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none"
+                >
+                  <option value="All">All Project Towers</option>
+                  {uniqueTowers.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+
+              {/* Selector 3: Select Contractor */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Select Contractor</label>
+                <select
+                  value={selectedCertContractor}
+                  onChange={(e) => setSelectedCertContractor(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-250 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none"
+                >
+                  <option value="All">All Contractors</option>
+                  {uniqueContractors.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* Selector 4: Info Badge */}
+              <div className="space-y-1.5 flex flex-col justify-end">
+                <div className="p-2 bg-zinc-50 border border-zinc-200 rounded-xl text-[10px] text-zinc-550 font-semibold leading-normal">
+                  ⚠️ <strong>Handover Exception:</strong> Checklist stages for Handover must be user-filled manually from the Flat Checklist popup.
+                </div>
+              </div>
+
+            </div>
+
+            {/* Extra inputs row for Handover Letter parameters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-zinc-150 pt-4 animate-fadeIn">
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Client / Site Contact Name</label>
+                <input
+                  type="text"
+                  value={clientContactName}
+                  onChange={(e) => setClientContactName(e.target.value)}
+                  placeholder="e.g. Rahatul Hoque"
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Site Address</label>
+                <input
+                  type="text"
+                  value={siteAddress}
+                  onChange={(e) => setSiteAddress(e.target.value)}
+                  placeholder="e.g. Godrej Woods, Sector 43, Noida, UP"
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+                />
+              </div>
+            </div>
+
+          </div>
+
+          {/* PHYSICAL CERTIFICATE DECK (TARGET FOR PRINTING) */}
+          <div className="printable-cert-deck space-y-10">
+              
+              {/* HANDING OVER COMPREHENSIVE CERTIFICATE LAYOUT */}
+              {handoverMode === 'certificate' && (
+                <div className="bg-white rounded-3xl border border-zinc-350 shadow-lg p-6 sm:p-7 max-w-4xl mx-auto space-y-5 relative overflow-hidden flex flex-col justify-between min-h-[720px] font-sans text-zinc-800">
+                  <div className="space-y-4">
+                    {/* Certificate Heading Board */}
+                    <div className="border-b-4 border-indigo-600 pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-13 h-13 shrink-0">
+                          <TufwudLogoTransparent className="w-full h-full text-[#8a5a37]" />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-extrabold tracking-wider bg-indigo-100 text-indigo-850 px-2.5 py-0.5 rounded-full uppercase font-mono border border-indigo-200">
+                            FINAL HANDING OVER PROTOCOL
+                          </span>
+                          <h2 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight font-sans">
+                            QUALITY HANDING OVER &amp; TAKE OVER CERTIFICATE
+                          </h2>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono text-xs text-zinc-550 space-y-0.5 font-bold shrink-0">
+                        <div>Cert No: HC-{flats[0]?.oaNo || '387026'}-FINAL</div>
+                        <div>Date: {new Date().toLocaleDateString()}</div>
+                        <div className="text-indigo-600 font-extrabold font-mono">Quality Handover Docket</div>
+                      </div>
+                    </div>
+
+                    {/* Formal Declaration Block */}
+                    <div className="p-3.5 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-1.5">
+                      <h3 className="font-bold text-[10px] uppercase tracking-wide text-zinc-800">Formal Transfer Declaration</h3>
+                      <p className="text-[11px] text-zinc-600 leading-normal font-semibold">
+                        We hereby declare and certify that the door sets and specifications listed below have undergone final de-snagging, rigorous alignment checks, and paint touch-ups. All keys are accounted for, hardware components are polished, and the openings are formally handed over to the Client in perfect working order.
+                      </p>
+                    </div>
+
+                    {/* Project Parameters */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold">
+                      <div className="space-y-0.5">
+                        <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Project / Sales Order</span>
+                        <span className="text-zinc-850 font-extrabold">{flats[0]?.oaNo || 'SO-387026'}</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Client Spec</span>
+                        <span className="text-zinc-850 font-extrabold">{flats[0]?.soDetails || 'Godrej Woods'}</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Site Supervisor</span>
+                        <span className="text-zinc-800 font-bold">{flats[0]?.supervisor || 'Aarif Taslim'}</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="block text-[9px] text-zinc-400 uppercase tracking-wider">Assigned Contractor</span>
+                        <span className="text-zinc-800 font-bold">{flats[0]?.contractor || 'Prabir Dhol'}</span>
+                      </div>
+                    </div>
+
+                    {/* Mapped Openings Table */}
+                    <div className="border border-zinc-250 rounded-xl overflow-hidden shadow-2xs">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-zinc-100 text-zinc-650 font-black uppercase border-b border-zinc-250 text-[9px] tracking-wider font-mono">
+                            <th className="px-4 py-2.5 w-1/4">Opening ID &amp; Location</th>
+                            <th className="px-4 py-2.5 w-1/4">Key &amp; Hardware Status</th>
+                            <th className="px-4 py-2.5 w-1/3">Stage Photos</th>
+                            <th className="px-4 py-2.5 text-center w-1/6">Handover Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200 font-semibold text-zinc-700">
+                          {flats
+                            .filter(d => {
+                              if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
+                              if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
+                              return true;
+                            })
+                            .slice(0, 8) // Limit to 8 rows for visual aesthetic print page-limit
+                            .map(door => {
+                              const progress = getFlatOverallProgress(door);
+                              
+                              // Gather all photos with their stage label keys
+                              const allStagePhotos = door.photos ? Object.entries(door.photos).flatMap(([stageKey, photosList]) => 
+                                (photosList || []).map(p => ({ ...p, stageKey }))
+                              ) : [];
+
+                              const getStageShortLabel = (key: string): string => {
+                                if (key === 'frame_install') return 'Frame';
+                                if (key === 'shutter_install') return 'Shutter';
+                                if (key === 'hardware_fixing') return 'Hdw';
+                                if (key === 'painting') return 'Paint';
+                                if (key === 'handover') return 'Handover';
+                                return key;
+                              };
+
+                              return (
+                                <tr key={door.id} className="hover:bg-zinc-50/20 transition">
+                                  <td className="px-4 py-2.5 font-mono">
+                                    <div className="font-bold text-zinc-950 text-[11px] truncate">{door.id.split('/').pop()}</div>
+                                    <div className="text-[10px] text-zinc-450 mt-0.5 font-sans">{door.towerId} | Level {door.floor} | Flat {door.flatNo}</div>
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    <div className="flex flex-col gap-1">
+                                      {door.handover.keysHandover ? (
+                                        <span className="w-fit px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-100 text-[8px] rounded font-extrabold uppercase">Keys Handed Over</span>
+                                      ) : (
+                                        <span className="w-fit px-1.5 py-0.5 bg-zinc-50 text-zinc-450 border border-zinc-150 text-[8px] rounded font-extrabold uppercase">Keys Pending</span>
+                                      )}
+                                      {door.hardwareFixing.hingeFitting && door.hardwareFixing.lockWithHandleFitting ? (
+                                        <span className="w-fit px-1.5 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-100 text-[8px] rounded font-extrabold uppercase">Hardware Mapped</span>
+                                      ) : (
+                                        <span className="w-fit px-1.5 py-0.5 bg-zinc-50 text-zinc-440 border border-zinc-150 text-[8px] rounded font-extrabold uppercase">Hardware Open</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {allStagePhotos.length > 0 ? (
+                                        allStagePhotos.slice(0, 4).map((photo, pIdx) => {
+                                          const label = getStageShortLabel(photo.stageKey);
+                                          return (
+                                            <div key={photo.id || pIdx} className="relative flex flex-col items-center">
+                                              <div className="w-8 h-8 rounded-md border border-zinc-250 overflow-hidden bg-zinc-100 shadow-3xs">
+                                                <img 
+                                                  src={photo.url} 
+                                                  alt={photo.name} 
+                                                  className="w-full h-full object-cover" 
+                                                  referrerPolicy="no-referrer"
+                                                />
+                                              </div>
+                                              <span className="text-[7px] text-zinc-500 font-extrabold uppercase mt-0.5 leading-none bg-zinc-100 px-1 py-0.5 rounded border border-zinc-150">{label}</span>
+                                            </div>
+                                          );
+                                        })
+                                      ) : (
+                                        <span className="text-[10px] text-zinc-400 italic">No stage photos uploaded</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2.5 text-center">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider font-mono ${
+                                      progress === 100 
+                                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                        : "bg-amber-100 text-amber-800 border border-amber-200"
+                                    }`}>
+                                      {progress === 100 ? "Ready" : "Audit"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          {flats.filter(d => {
+                            if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
+                            if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
+                            return true;
+                          }).length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="px-5 py-8 text-center text-zinc-450 italic font-medium bg-zinc-50">
+                                No matching openings found in the selected scope filter.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Footer Signature Docket */}
+                  <div className="space-y-6 pt-6 border-t border-zinc-200">
+                    <div className="grid grid-cols-3 gap-6 pt-4 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-450 font-mono">
+                      <div className="space-y-12">
+                        <div className="border-b border-zinc-300 mx-auto w-3/4" />
+                        <div>HANDED OVER BY (Tufwud Site Supervisor)</div>
+                      </div>
+                      <div className="space-y-12">
+                        <div className="border-b border-zinc-300 mx-auto w-3/4" />
+                        <div>VERIFIED BY (Tufwud Lead QA Auditor)</div>
+                      </div>
+                      <div className="space-y-12">
+                        <div className="border-b border-zinc-300 mx-auto w-3/4 text-indigo-300" />
+                        <div className="text-indigo-600 font-extrabold">TAKEN OVER BY (Authorized Client Representative)</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* HANDING OVER FORMAL LETTER LAYOUT */}
+              {handoverMode === 'letter' && (() => {
+                // Group flats by floor or tower-floor
+                const floorsGrouped: { [key: string]: { total: number; installed: number; handedOver: number } } = {};
+                flats
+                  .filter(d => {
+                    if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
+                    if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
+                    return true;
+                  })
+                  .forEach(door => {
+                    const key = selectedCertTower === 'All' ? `${door.towerId} - Level ${door.floor}` : `Level ${door.floor}`;
+                    if (!floorsGrouped[key]) {
+                      floorsGrouped[key] = { total: 0, installed: 0, handedOver: 0 };
+                    }
+                    const isInstalled = getFlatOverallProgress(door) >= 100;
+                    const isKeysHandedOver = getSubtaskWeight(door.handover.keysHandover) === 1.0;
+                    floorsGrouped[key].total += 1;
+                    if (isInstalled) {
+                      floorsGrouped[key].installed += 1;
+                    }
+                    if (isInstalled && isKeysHandedOver) {
+                      floorsGrouped[key].handedOver += 1;
+                    }
+                  });
+
+                let totalDoorsCount = 0;
+                let totalInstalledCount = 0;
+                let totalHandedOverCount = 0;
+                Object.values(floorsGrouped).forEach(g => {
+                  totalDoorsCount += g.total;
+                  totalInstalledCount += g.installed;
+                  totalHandedOverCount += g.handedOver;
+                });
+                const totalHandoverPct = totalDoorsCount > 0 ? Math.round((totalHandedOverCount / totalDoorsCount) * 100) : 0;
+                const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+                return (
+                  <div className="bg-white rounded-3xl border border-zinc-300 shadow-lg p-8 sm:p-12 max-w-4xl mx-auto space-y-8 relative overflow-hidden flex flex-col justify-between min-h-[850px] text-zinc-800 font-sans">
+                    <div className="space-y-6">
+                      {/* Brand Header */}
+                      <div className="border-b-2 border-[#8a5a37] pb-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-12 h-12 shrink-0">
+                            <TufwudLogoTransparent className="w-full h-full text-[#8a5a37]" />
+                          </div>
+                          <div className="text-left">
+                            <div className="text-xl sm:text-2xl font-black text-[#6b4226] tracking-wide font-sans">
+                              TUFWUD DOORS &amp; ACCESSORIES PVT. LTD.
+                            </div>
+                            <div className="text-[11px] font-extrabold text-zinc-550 tracking-widest uppercase mt-0.5">
+                              Site Installation — Handover Letter
+                            </div>
+                          </div>
+                        </div>
+                        <div className="hidden sm:block text-right text-[10px] font-black text-[#8a5a37] tracking-wider font-mono">
+                          QUALITY TRANSFER PROTOCOL
+                        </div>
+                      </div>
+
+                      {/* Metadata block */}
+                      <div className="flex justify-between items-start text-xs font-semibold text-zinc-650 pt-2 font-mono">
+                        <div>Date: {todayStr}</div>
+                        <div>Order No: {flats[0]?.oaNo || 'SO-387026'}-FINAL</div>
+                      </div>
+
+                      {/* Recipient Address */}
+                      <div className="space-y-1.5 text-xs font-semibold pt-4 text-zinc-700">
+                        <div className="font-extrabold uppercase tracking-wide text-zinc-400 text-[10px]">To,</div>
+                        <div className="text-sm font-black text-zinc-900">{clientContactName || '_______________________'}</div>
+                        <div className="text-xs text-zinc-550 leading-relaxed max-w-md" style={{ whiteSpace: 'pre-wrap' }}>
+                          {siteAddress || '_______________________'}
+                        </div>
+                      </div>
+
+                      {/* Subject Line */}
+                      <div className="bg-zinc-50 border border-zinc-200/60 p-3.5 rounded-xl text-xs text-zinc-900 font-black">
+                        Subject: Handover of door installation work — Order No. {flats[0]?.oaNo || 'SO-387026'}
+                      </div>
+
+                      {/* Salutation and Letter Body */}
+                      <div className="space-y-3.5 text-xs text-zinc-650 leading-relaxed font-medium">
+                        <p>Dear Sir/Madam,</p>
+                        <p>
+                          This is to confirm the status of door, frame, architrave and hardware installation carried out under the
+                          above order, as recorded on site. As of <strong className="text-zinc-950 font-bold">{todayStr}</strong>, <strong className="text-[#8a5a37] font-extrabold">{totalHandedOverCount} of {totalDoorsCount} doors ({totalHandoverPct}%)</strong> have been
+                          installed, inspected and signed off for handover.
+                        </p>
+                      </div>
+
+                      {/* Floor Summary Table */}
+                      <div className="border border-zinc-250 rounded-xl overflow-hidden shadow-3xs mt-4 font-sans">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-zinc-100 text-zinc-650 font-black uppercase border-b border-zinc-250 text-[10px] tracking-wider font-mono">
+                              <th className="px-5 py-3">Floor / Tower Location</th>
+                              <th className="px-5 py-3 text-center w-24">Total Doors</th>
+                              <th className="px-5 py-3 text-center w-24">Installed</th>
+                              <th className="px-5 py-3 text-center w-28">Handed Over</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-200 font-semibold text-zinc-700">
+                            {Object.entries(floorsGrouped).map(([floorKey, counts]) => (
+                              <tr key={floorKey} className="hover:bg-zinc-50/20 transition">
+                                <td className="px-5 py-3.5 font-bold text-zinc-900">{floorKey}</td>
+                                <td className="px-5 py-3.5 text-center font-mono text-zinc-500">{counts.total}</td>
+                                <td className="px-5 py-3.5 text-center font-mono text-emerald-600">{counts.installed}</td>
+                                <td className="px-5 py-3.5 text-center font-mono text-indigo-650 font-bold bg-indigo-50/10">{counts.handedOver}</td>
+                              </tr>
+                            ))}
+                            {totalDoorsCount > 0 && (
+                              <tr className="bg-zinc-50 font-black text-zinc-900 border-t-2 border-zinc-250 font-mono text-[11px]">
+                                <td className="px-5 py-4">GRAND TOTAL</td>
+                                <td className="px-5 py-4 text-center">{totalDoorsCount}</td>
+                                <td className="px-5 py-4 text-center text-emerald-700">{totalInstalledCount}</td>
+                                <td className="px-5 py-4 text-center text-indigo-700 bg-indigo-50/20">{totalHandedOverCount} ({totalHandoverPct}%)</td>
+                              </tr>
+                            )}
+                            {totalDoorsCount === 0 && (
+                              <tr>
+                                <td colSpan={4} className="px-5 py-8 text-center text-zinc-450 italic bg-zinc-50 font-medium">
+                                  No matching records found for floor grouping.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Verification Note */}
+                      <p className="text-[11px] text-zinc-500 italic leading-relaxed pt-2">
+                        We request you to kindly review the installed work and countersign below to confirm formal receipt and site handover.
+                      </p>
+                    </div>
+
+                    {/* Signatures Row */}
+                    <div className="space-y-6 pt-10 mt-10 border-t border-zinc-200">
+                      <div className="grid grid-cols-2 gap-10 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-450 font-mono">
+                        <div className="space-y-12">
+                          <div className="border-b border-zinc-350 mx-auto w-5/6" />
+                          <div className="text-zinc-550">
+                            For Tufwud Doors &amp; Accessories Pvt. Ltd.
+                            <span className="block text-[9px] text-zinc-400 font-medium tracking-normal mt-0.5 lowercase font-sans">name, signature &amp; date</span>
+                          </div>
+                        </div>
+                        <div className="space-y-12">
+                          <div className="border-b border-zinc-350 mx-auto w-5/6 text-indigo-300" />
+                          <div className="text-indigo-650 font-extrabold">
+                            Client / Authorized Site Representative
+                            <span className="block text-[9px] text-zinc-400 font-medium tracking-normal mt-0.5 lowercase font-sans">name, signature &amp; date</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
           </div>
 
         </div>

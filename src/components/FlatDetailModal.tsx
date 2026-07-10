@@ -241,6 +241,10 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
 
   // Bulk update checklist for active stage
   const handleStageBulkUpdate = (milestoneKey: MilestoneKey, complete: boolean) => {
+    if (milestoneKey === 'handover') {
+      // Handover is manual-only exception
+      return;
+    }
     setFormData(prev => {
       if (!prev) return null;
       const meta = MILESTONES.find(m => m.key === milestoneKey);
@@ -273,6 +277,10 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
       
       MILESTONES.forEach(meta => {
         const milestoneKey = meta.key;
+        if (milestoneKey === 'handover') {
+          // Handover is manual-only exception and is left untouched during bulk approve all
+          return;
+        }
         const currentMilestone = { ...(updated[milestoneKey] || {}) } as any;
         
         Object.keys(meta.subtaskLabels).forEach(taskKey => {
@@ -702,10 +710,10 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                 type="button"
                 onClick={handleAllStagesBulkApproved}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-650 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[10.5px] font-extrabold rounded-xl transition shadow-3xs cursor-pointer select-none tracking-wider uppercase shrink-0"
-                title="Instantly set every checklist item across all 5 quality stages to 100% Approved"
+                title="Instantly set every checklist item across all stages (except Handover) to Approved"
               >
                 <CheckSquare className="w-3.5 h-3.5" />
-                <span>All Stages Approved (100%)</span>
+                <span>All Stages Approved (Excl. Handover)</span>
               </button>
             </div>
 
@@ -740,35 +748,41 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
               {/* Checkpoint checklist group */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-200/50">
-                  <span className="text-xs font-bold text-zinc-800 uppercase tracking-tight">Requirement Toggles</span>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => handleStageBulkUpdate(activeTab, true)}
-                      className="text-[10px] font-bold text-indigo-650 hover:text-indigo-800 uppercase"
-                      title="Approve all items in current tab only"
-                    >
-                      Fill Active Approved
-                    </button>
-                    <span className="text-zinc-300">|</span>
-                    <button
-                      type="button"
-                      onClick={handleAllStagesBulkApproved}
-                      className="text-[10px] font-extrabold text-emerald-650 hover:text-emerald-800 uppercase bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
-                      title="Approve all items in ALL stages at once"
-                    >
-                      FILL ALL APPROVED (ALL STAGES)
-                    </button>
-                    <span className="text-zinc-300">|</span>
-                    <button
-                      type="button"
-                      onClick={() => handleStageBulkUpdate(activeTab, false)}
-                      className="text-[10px] font-bold text-zinc-500 hover:text-zinc-800 uppercase"
-                      title="Clear items in current tab"
-                    >
-                      Clear Active
-                    </button>
-                  </div>
+                  <span className="text-xs font-bold text-zinc-800 uppercase tracking-tight font-sans">Requirement Toggles</span>
+                  {activeTab !== 'handover' ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleStageBulkUpdate(activeTab, true)}
+                        className="text-[10px] font-bold text-indigo-650 hover:text-indigo-800 uppercase"
+                        title="Approve all items in current tab only"
+                      >
+                        Fill Active Approved
+                      </button>
+                      <span className="text-zinc-300">|</span>
+                      <button
+                        type="button"
+                        onClick={handleAllStagesBulkApproved}
+                        className="text-[10px] font-extrabold text-emerald-650 hover:text-emerald-800 uppercase bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
+                        title="Approve all items in ALL stages at once"
+                      >
+                        FILL ALL APPROVED (ALL STAGES)
+                      </button>
+                      <span className="text-zinc-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => handleStageBulkUpdate(activeTab, false)}
+                        className="text-[10px] font-bold text-zinc-500 hover:text-zinc-800 uppercase"
+                        title="Clear items in current tab"
+                      >
+                        Clear Active
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[9px] font-extrabold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200 uppercase font-mono tracking-wider">
+                      ⚠️ Handover Stage: Exception (Requires Manual Selection)
+                    </div>
+                  )}
                 </div>
 
                 {(() => {

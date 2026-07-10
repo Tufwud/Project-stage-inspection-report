@@ -456,6 +456,32 @@ export default function App() {
             }
             seenIds.add(flat.id);
             return true;
+          }).map(flat => {
+            // Guarantee painting and handover properties exist to avoid backfire on historical records
+            const clone = { ...flat };
+            if (!clone.painting) {
+              clone.painting = {
+                frameCarpatchFillingSanding: 'not_started',
+                frameTouchUp: 'not_started',
+                shutterEdgeFinishing: 'not_started',
+                lockSlotAreaFinishing: 'not_started',
+                shutterTouchUp: 'not_started',
+                timestamp: '',
+                contractor: '',
+                doneBy: ''
+              };
+            }
+            if (!clone.handover) {
+              clone.handover = {
+                hardwareCleaning: 'not_started',
+                plasticCoverRemoval: 'not_started',
+                keysHandover: 'not_started',
+                timestamp: '',
+                contractor: '',
+                doneBy: ''
+              };
+            }
+            return clone;
           });
         }
         setFlats(initialFlats);
@@ -495,6 +521,31 @@ export default function App() {
               }
               seenIds.add(flat.id);
               return true;
+            }).map(flat => {
+              const clone = { ...flat };
+              if (!clone.painting) {
+                clone.painting = {
+                  frameCarpatchFillingSanding: 'not_started',
+                  frameTouchUp: 'not_started',
+                  shutterEdgeFinishing: 'not_started',
+                  lockSlotAreaFinishing: 'not_started',
+                  shutterTouchUp: 'not_started',
+                  timestamp: '',
+                  contractor: '',
+                  doneBy: ''
+                };
+              }
+              if (!clone.handover) {
+                clone.handover = {
+                  hardwareCleaning: 'not_started',
+                  plasticCoverRemoval: 'not_started',
+                  keysHandover: 'not_started',
+                  timestamp: '',
+                  contractor: '',
+                  doneBy: ''
+                };
+              }
+              return clone;
             });
             return {
               ...proj,
@@ -619,6 +670,10 @@ export default function App() {
       
       MILESTONES.forEach(meta => {
         const milestoneKey = meta.key;
+        if (milestoneKey === 'handover') {
+          // Handover stage must be user filled and is an exception from auto-fill all
+          return;
+        }
         const currentMilestone = { ...(updated[milestoneKey] || {}) } as any;
         
         Object.keys(meta.subtaskLabels).forEach(taskKey => {
