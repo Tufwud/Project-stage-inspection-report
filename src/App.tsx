@@ -631,20 +631,28 @@ export default function App() {
   };
 
   const handleSaveFlat = (updated: FlatRecord) => {
-    const index = flats.findIndex(f => f.id === updated.id);
+    // If editing, locate via original editing ID to allow updating/regenerating the unique ID itself safely
+    const originalId = editingFlat?.id || updated.id;
+    const index = flats.findIndex(f => f.id === originalId);
     let updatedList: FlatRecord[] = [];
+    
+    // Dynamically regenerate ID to maintain strict structural integrity of the lookup keys
+    const floorName = updated.floor + getOrdinalSuffix(updated.floor) + ' Floor';
+    const cleanDoorName = updated.doorName || "Main Door (MD)";
+    const newID = `${updated.oaNo || 'SO'}/${updated.towerId}/${floorName}/${updated.flatNo}/${cleanDoorName}`;
+    
+    const finalizedRecord = {
+      ...updated,
+      id: newID
+    };
     
     if (index > -1) {
       // Edit
       updatedList = [...flats];
-      updatedList[index] = updated;
+      updatedList[index] = finalizedRecord;
     } else {
       // Create new
-      // Check if ID was a temporary NEW indicator
-      if (updated.id.startsWith('NEW') || !updated.id) {
-        updated.id = `REC-${Date.now().toString().slice(-4)}`;
-      }
-      updatedList = [updated, ...flats];
+      updatedList = [finalizedRecord, ...flats];
     }
     
     saveFlats(updatedList);

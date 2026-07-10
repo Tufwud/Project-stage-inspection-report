@@ -597,7 +597,13 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                   onChange={handleMetaChange}
                   className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-zinc-500 font-medium bg-white"
                 >
-                  {TOWERS_LIST.map(t => <option key={t} value={t}>{t}</option>)}
+                  {(() => {
+                    const selectOptions = [...TOWERS_LIST];
+                    if (formData.towerId && !selectOptions.includes(formData.towerId)) {
+                      selectOptions.push(formData.towerId);
+                    }
+                    return selectOptions.map(t => <option key={t} value={t}>{t}</option>);
+                  })()}
                 </select>
               </div>
 
