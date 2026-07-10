@@ -62,6 +62,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
   const [handoverMode, setHandoverMode] = useState<'certificate' | 'letter'>('certificate');
   const [clientContactName, setClientContactName] = useState('Rahatul Hoque');
   const [siteAddress, setSiteAddress] = useState('Godrej Woods, Sector 43, Noida, UP');
+  const [companyAddressKey, setCompanyAddressKey] = useState<'kolkata' | 'mumbai'>('kolkata');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Running Bill Specific States
@@ -183,6 +184,401 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
     const a = document.createElement('a');
     a.href = url;
     a.download = `Tufwud_Handover_${handoverMode === 'certificate' ? 'Certificate' : 'Letter'}_${flats[0]?.oaNo || 'SO'}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAsWord = () => {
+    const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const filtered = flats.filter(d => {
+      if (selectedCertTower !== 'All' && d.towerId !== selectedCertTower) return false;
+      if (selectedCertContractor !== 'All' && d.contractor !== selectedCertContractor) return false;
+      return true;
+    });
+
+    const firstFlat = flats[0];
+    const salesOrder = firstFlat?.oaNo || 'SO-387026';
+    const clientSpec = firstFlat?.soDetails || 'Godrej Woods';
+    const siteSupervisor = firstFlat?.supervisor || 'Aarif Taslim';
+    const assignedContractor = firstFlat?.contractor || 'Prabir Dhol';
+
+    let contentHtml = '';
+
+    if (handoverMode === 'letter') {
+      // Group flats by floor or tower-floor
+      const floorsGrouped: { [key: string]: { total: number; installed: number; handedOver: number } } = {};
+      filtered.forEach(door => {
+        const key = selectedCertTower === 'All' ? `${door.towerId} - Level ${door.floor}` : `Level ${door.floor}`;
+        if (!floorsGrouped[key]) {
+          floorsGrouped[key] = { total: 0, installed: 0, handedOver: 0 };
+        }
+        const isInstalled = getFlatOverallProgress(door) >= 100;
+        const isKeysHandedOver = getSubtaskWeight(door.handover.keysHandover) === 1.0;
+        floorsGrouped[key].total += 1;
+        if (isInstalled) {
+          floorsGrouped[key].installed += 1;
+        }
+        if (isInstalled && isKeysHandedOver) {
+          floorsGrouped[key].handedOver += 1;
+        }
+      });
+
+      let totalDoorsCount = 0;
+      let totalInstalledCount = 0;
+      let totalHandedOverCount = 0;
+      Object.values(floorsGrouped).forEach(g => {
+        totalDoorsCount += g.total;
+        totalInstalledCount += g.installed;
+        totalHandedOverCount += g.handedOver;
+      });
+      const totalHandoverPct = totalDoorsCount > 0 ? Math.round((totalHandedOverCount / totalDoorsCount) * 100) : 0;
+
+      let tableRowsHtml = '';
+      Object.entries(floorsGrouped).forEach(([floorKey, counts]) => {
+        tableRowsHtml += `
+          <tr>
+            <td style="border: 1px solid #d1d5db; padding: 10px; font-weight: bold; color: #111827; font-family: 'Calibri', 'Arial', sans-serif;">${floorKey}</td>
+            <td align="center" style="border: 1px solid #d1d5db; padding: 10px; color: #4b5563; font-family: 'Consolas', monospace;">${counts.total}</td>
+            <td align="center" style="border: 1px solid #d1d5db; padding: 10px; color: #10b981; font-weight: bold; font-family: 'Consolas', monospace;">${counts.installed}</td>
+            <td align="center" style="border: 1px solid #d1d5db; padding: 10px; color: #4f46e5; font-weight: bold; background-color: #f5f3ff; font-family: 'Consolas', monospace;">${counts.handedOver}</td>
+          </tr>
+        `;
+      });
+
+      if (totalDoorsCount > 0) {
+        tableRowsHtml += `
+          <tr style="background-color: #f9fafb; font-weight: bold; border-top: 2px solid #9ca3af;">
+            <td style="border: 1px solid #d1d5db; padding: 12px; font-weight: 950; color: #111827; font-family: 'Calibri', 'Arial', sans-serif;">GRAND TOTAL</td>
+            <td align="center" style="border: 1px solid #d1d5db; padding: 12px; font-family: 'Consolas', monospace;">${totalDoorsCount}</td>
+            <td align="center" style="border: 1px solid #d1d5db; padding: 12px; color: #047857; font-family: 'Consolas', monospace;">${totalInstalledCount}</td>
+            <td align="center" style="border: 1px solid #d1d5db; padding: 12px; color: #4338ca; background-color: #e0e7ff; font-family: 'Consolas', monospace;">${totalHandedOverCount} (${totalHandoverPct}%)</td>
+          </tr>
+        `;
+      } else {
+        tableRowsHtml += `
+          <tr>
+            <td colspan="4" align="center" style="border: 1px solid #d1d5db; padding: 25px; color: #9ca3af; font-style: italic; font-family: 'Calibri', 'Arial', sans-serif;">
+              No matching records found for floor grouping.
+            </td>
+          </tr>
+        `;
+      }
+
+      contentHtml = `
+        <!-- Official Corporate Letterhead -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-bottom: 25px; border-bottom: 3px solid #8a5a37; padding-bottom: 20px;">
+          <tr>
+            <td width="55%" valign="top" style="text-align: left; font-family: 'Calibri', 'Arial', sans-serif;">
+              <div style="font-size: 26pt; font-weight: 900; color: #6b4226; letter-spacing: -0.5px; line-height: 1.0;">TUFWUD</div>
+              <div style="font-size: 9.5pt; font-weight: bold; color: #71717a; text-transform: uppercase; margin-top: 5px; letter-spacing: 1.5px;">Site Installation — Handover Letter</div>
+              <div style="margin-top: 12px;">
+                <span style="font-size: 8.5pt; font-weight: bold; color: #4b5563; border: 1px solid #d1d5db; padding: 3px 8px; background-color: #f9fafb; margin-right: 6px; border-radius: 4px;">FSC® C157844</span>
+                <span style="font-size: 8.5pt; font-weight: bold; color: #4b5563; border: 1px solid #d1d5db; padding: 3px 8px; background-color: #f9fafb; margin-right: 6px; border-radius: 4px;">ISO Certified</span>
+                <span style="font-size: 8.5pt; font-weight: bold; color: #4b5563; border: 1px solid #d1d5db; padding: 3px 8px; background-color: #f9fafb; border-radius: 4px;">ISI Certified</span>
+              </div>
+            </td>
+            <td width="45%" valign="top" style="text-align: right; font-family: 'Calibri', 'Arial', sans-serif;">
+              <div style="font-size: 10.5pt; font-weight: 900; color: #111827; text-transform: uppercase; letter-spacing: 0.5px;">Tufwud Doors & Accessories Private Limited</div>
+              <div style="font-size: 8.5pt; font-weight: bold; color: #52525b; font-style: italic; margin-top: 2px;">Formerly "Khemka Timber Pvt. Ltd"</div>
+              <div style="font-size: 8pt; font-weight: bold; color: #a1a1aa; font-family: 'Consolas', monospace; margin-top: 2px;">CIN: U20219WB1988PTC045247</div>
+              <div style="font-size: 8.5pt; color: #4b5563; margin-top: 8px; line-height: 1.4;">
+                ${companyAddressKey === 'kolkata' ? 
+                  `<span style="font-weight: bold; color: #1f2937; font-size: 9pt;">📍 111, D. H. Road, Behala, Kadamtala, Kolkata 700 063</span>` : 
+                  `<span style="font-weight: bold; color: #1f2937; font-size: 9pt;">📍 Sai Sangam Building, 4th Floor Flat No. 406, Plot 51A, Sector 16 Ulwe, Kharkopar, Navi Mumbai 410 206</span>`
+                }
+                <br />
+                <span style="color: #4b5563; font-size: 8pt;">📞 +91 84200 50754 / +91 83350 60453 | ✉️ sales@tufwud.in / admin@tufwud.in</span>
+                <br />
+                <span style="font-weight: bold; color: #4b5563; font-family: 'Consolas', monospace; font-size: 8.5pt;">🌐 www.tufwud.com</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Metadata Block -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-bottom: 25px; font-family: 'Calibri', 'Arial', sans-serif;">
+          <tr>
+            <td width="50%" align="left" style="font-size: 10.5pt; font-weight: bold; color: #111827;">Date: ${todayStr}</td>
+            <td width="50%" align="right" style="font-size: 10.5pt; font-weight: bold; color: #111827;">Order No: ${salesOrder}-FINAL</td>
+          </tr>
+        </table>
+
+        <!-- Recipient Address -->
+        <div style="margin-bottom: 25px; font-family: 'Calibri', 'Arial', sans-serif;">
+          <div style="font-size: 9pt; font-weight: bold; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">To,</div>
+          <div style="font-size: 12pt; font-weight: bold; color: #111827; margin-top: 3px;">${clientContactName || '_______________________'}</div>
+          <div style="font-size: 10.5pt; color: #4b5563; white-space: pre-wrap; margin-top: 3px; max-width: 450px; line-height: 1.4;">${siteAddress || '_______________________'}</div>
+        </div>
+
+        <!-- Subject Line -->
+        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 12px 18px; border-radius: 8px; font-family: 'Calibri', 'Arial', sans-serif; font-size: 10.5pt; font-weight: bold; color: #111827; margin-bottom: 25px;">
+          Subject: Handover of door installation work — Order No. {flats[0]?.oaNo || 'SO-387026'}
+        </div>
+
+        <!-- Salutation and Letter Body -->
+        <div style="font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; color: #374151; line-height: 1.5; margin-bottom: 30px;">
+          <p>Dear Sir/Madam,</p>
+          <p>
+            This letter serves to formally confirm the status and progressive handover of the door, frame, architrave, and hardware installation works executed under the aforementioned contract order. All specified units, as detailed in the comprehensive schedule below, have been meticulously installed, inspected for quality compliance, and officially signed off as ready for handover as of <strong>${todayStr}</strong>.
+          </p>
+        </div>
+
+        <!-- Floors Summary Table -->
+        <table width="100%" border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse; border: 1px solid #d1d5db; font-family: 'Calibri', 'Arial', sans-serif; font-size: 10pt; margin-bottom: 30px;">
+          <thead>
+            <tr style="background-color: #f3f4f6; color: #4b5563; font-weight: bold; text-transform: uppercase; font-size: 9pt; height: 35px;">
+              <th align="left" style="padding: 10px; border: 1px solid #d1d5db;">Floor / Tower Location</th>
+              <th align="center" style="padding: 10px; border: 1px solid #d1d5db; width: 110px;">Total Doors</th>
+              <th align="center" style="padding: 10px; border: 1px solid #d1d5db; width: 110px;">Installed</th>
+              <th align="center" style="padding: 10px; border: 1px solid #d1d5db; width: 130px;">Handed Over</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
+
+        <!-- Verification Note -->
+        <div style="font-family: 'Calibri', 'Arial', sans-serif; font-size: 10.5pt; color: #6b7280; font-style: italic; margin-bottom: 45px;">
+          We request you to kindly review the installed work and countersign below to confirm formal receipt and site handover.
+        </div>
+
+        <!-- Signatures Table -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: 'Calibri', 'Arial', sans-serif; margin-bottom: 50px;">
+          <tr>
+            <td width="45%" valign="top" style="text-align: center;">
+              <div style="border-bottom: 1px solid #9ca3af; margin: 0 auto 12px auto; width: 85%; height: 40px;">&nbsp;</div>
+              <div style="font-size: 10pt; font-weight: bold; color: #4b5563;">
+                For Tufwud Doors &amp; Accessories Pvt. Ltd.
+                <span style="display: block; font-size: 8.5pt; color: #9ca3af; font-weight: normal; margin-top: 3px;">name, signature &amp; date</span>
+              </div>
+            </td>
+            <td width="10%">&nbsp;</td>
+            <td width="45%" valign="top" style="text-align: center;">
+              <div style="border-bottom: 1px solid #4f46e5; margin: 0 auto 12px auto; width: 85%; height: 40px;">&nbsp;</div>
+              <div style="font-size: 10pt; font-weight: bold; color: #4f46e5;">
+                Client / Authorized Site Representative
+                <span style="display: block; font-size: 8.5pt; color: #9ca3af; font-weight: normal; margin-top: 3px;">name, signature &amp; date</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Premium Corporate Footer -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; border-top: 1.5px solid #8a5a37; padding-top: 15px; margin-top: 40px; font-family: 'Calibri', 'Arial', sans-serif;">
+          <tr>
+            <td width="50%" align="left" style="font-size: 9pt; font-weight: bold; color: #6b7280; text-transform: uppercase;">
+              Kolkata | Mumbai | Delhi | Bangalore
+            </td>
+            <td width="50%" align="right" style="font-size: 9.5pt; font-weight: 900; color: #8a5a37; letter-spacing: 0.5px;">
+              CHOOSE INSULATED - CHOOSE TUFWUD
+            </td>
+          </tr>
+        </table>
+      `;
+    } else {
+      // handoverMode === 'certificate'
+      let certTableRowsHtml = '';
+      filtered.slice(0, 8).forEach(door => {
+        const progress = getFlatOverallProgress(door);
+        const keysStatus = door.handover?.keysHandover ? 'Keys Handed Over' : 'Keys Pending';
+        const hardwareStatus = (door.hardwareFixing?.hingeFitting && door.hardwareFixing?.lockWithHandleFitting) ? 'Hardware Mapped' : 'Hardware Open';
+        
+        // Find stages with photos to display clean textual checklist
+        const stagesList: string[] = [];
+        if (door.photos?.frame_install?.length) stagesList.push('Frame');
+        if (door.photos?.shutter_install?.length) stagesList.push('Shutter');
+        if (door.photos?.hardware_fixing?.length) stagesList.push('Hdw');
+        if (door.photos?.painting?.length) stagesList.push('Paint');
+        if (door.photos?.handover?.length) stagesList.push('Handover');
+        
+        const photoChecklist = stagesList.length > 0 ? stagesList.map(s => `✓ ${s}`).join('  ') : 'No photos';
+
+        certTableRowsHtml += `
+          <tr>
+            <td style="border: 1px solid #d1d5db; padding: 10px; font-family: 'Consolas', monospace; font-weight: bold; font-size: 9.5pt; color: #111827;">
+              ${door.id.split('/').pop()}
+              <div style="font-family: 'Calibri', 'Arial', sans-serif; font-size: 8.5pt; color: #6b7280; font-weight: normal; margin-top: 2px;">
+                ${door.towerId} | Level ${door.floor} | Flat ${door.flatNo}
+              </div>
+            </td>
+            <td style="border: 1px solid #d1d5db; padding: 10px; font-family: 'Calibri', 'Arial', sans-serif; font-size: 9pt;">
+              <div style="font-weight: bold; color: ${door.handover?.keysHandover ? '#047857' : '#4b5563'}">${keysStatus}</div>
+              <div style="color: #6b7280; font-size: 8.5pt; margin-top: 3px;">${hardwareStatus}</div>
+            </td>
+            <td style="border: 1px solid #d1d5db; padding: 10px; font-family: 'Calibri', 'Arial', sans-serif; font-size: 9pt; color: #4b5563;">
+              ${photoChecklist}
+            </td>
+            <td align="center" style="border: 1px solid #d1d5db; padding: 10px; font-family: 'Consolas', monospace; font-weight: bold; font-size: 9.5pt; color: ${progress === 100 ? '#047857' : '#b45309'}; background-color: ${progress === 100 ? '#ecfdf5' : '#fffbeb'};">
+              ${progress === 100 ? 'READY' : 'AUDIT'}
+            </td>
+          </tr>
+        `;
+      });
+
+      if (filtered.length === 0) {
+        certTableRowsHtml += `
+          <tr>
+            <td colspan="4" align="center" style="border: 1px solid #d1d5db; padding: 25px; color: #9ca3af; font-style: italic; font-family: 'Calibri', 'Arial', sans-serif;">
+              No matching openings found in the selected scope filter.
+            </td>
+          </tr>
+        `;
+      }
+
+      contentHtml = `
+        <!-- Certificate Header (2-column layout) -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-bottom: 25px; border-bottom: 4px solid #4f46e5; padding-bottom: 20px;">
+          <tr>
+            <td width="60%" valign="top" style="text-align: left; font-family: 'Calibri', 'Arial', sans-serif;">
+              <span style="font-size: 8.5pt; font-weight: bold; letter-spacing: 1.5px; background-color: #e0e7ff; color: #3730a3; padding: 3px 10px; border-radius: 50px; text-transform: uppercase;">
+                FINAL HANDING OVER PROTOCOL
+              </span>
+              <div style="font-size: 22pt; font-weight: 900; color: #111827; letter-spacing: -0.5px; line-height: 1.1; margin-top: 10px;">
+                QUALITY HANDING OVER &amp; TAKE OVER CERTIFICATE
+              </div>
+            </td>
+            <td width="40%" valign="top" style="text-align: right; font-family: 'Calibri', 'Arial', sans-serif; font-size: 9.5pt; color: #4b5563; font-weight: bold;">
+              <div>Cert No: HC-${salesOrder}-FINAL</div>
+              <div style="margin-top: 3px;">Date: ${todayStr}</div>
+              <div style="color: #4f46e5; font-weight: 900; margin-top: 4px;">Quality Handover Docket</div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Formal Declaration Block -->
+        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 12px; font-family: 'Calibri', 'Arial', sans-serif; margin-bottom: 25px;">
+          <div style="font-size: 9pt; font-weight: bold; text-transform: uppercase; color: #111827; letter-spacing: 0.5px; margin-bottom: 5px;">Formal Transfer Declaration</div>
+          <div style="font-size: 10.5pt; color: #4b5563; line-height: 1.5;">
+            We hereby declare and certify that the door sets and specifications listed below have undergone final de-snagging, rigorous alignment checks, and paint touch-ups. All keys are accounted for, hardware components are polished, and the openings are formally handed over to the Client in perfect working order.
+          </div>
+        </div>
+
+        <!-- Project Parameters Box -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; background-color: #f3f4f6; border-radius: 8px; margin-bottom: 25px; font-family: 'Calibri', 'Arial', sans-serif; font-size: 10pt;">
+          <tr>
+            <td width="25%" style="padding: 12px; border-right: 1px solid #e5e7eb;">
+              <span style="display: block; font-size: 8pt; color: #9ca3af; text-transform: uppercase;">Project / Sales Order</span>
+              <strong style="display: block; color: #111827; margin-top: 2px;">${salesOrder}</strong>
+            </td>
+            <td width="25%" style="padding: 12px; border-right: 1px solid #e5e7eb;">
+              <span style="display: block; font-size: 8pt; color: #9ca3af; text-transform: uppercase;">Client Spec</span>
+              <strong style="display: block; color: #111827; margin-top: 2px;">${clientSpec}</strong>
+            </td>
+            <td width="25%" style="padding: 12px; border-right: 1px solid #e5e7eb;">
+              <span style="display: block; font-size: 8pt; color: #9ca3af; text-transform: uppercase;">Site Supervisor</span>
+              <strong style="display: block; color: #111827; margin-top: 2px;">${siteSupervisor}</strong>
+            </td>
+            <td width="25%" style="padding: 12px;">
+              <span style="display: block; font-size: 8pt; color: #9ca3af; text-transform: uppercase;">Assigned Contractor</span>
+              <strong style="display: block; color: #111827; margin-top: 2px;">${assignedContractor}</strong>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Mapped Openings Table -->
+        <table width="100%" border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse; border: 1px solid #d1d5db; font-family: 'Calibri', 'Arial', sans-serif; font-size: 10pt; margin-bottom: 30px;">
+          <thead>
+            <tr style="background-color: #f3f4f6; color: #4b5563; font-weight: bold; text-transform: uppercase; font-size: 9pt; height: 35px;">
+              <th align="left" style="padding: 10px; border: 1px solid #d1d5db; width: 25%;">Opening ID &amp; Location</th>
+              <th align="left" style="padding: 10px; border: 1px solid #d1d5db; width: 25%;">Key &amp; Hardware Status</th>
+              <th align="left" style="padding: 10px; border: 1px solid #d1d5db; width: 33%;">Stage Photos Checklist</th>
+              <th align="center" style="padding: 10px; border: 1px solid #d1d5db; width: 17%;">Handover Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${certTableRowsHtml}
+          </tbody>
+        </table>
+
+        <!-- Footer Signature Docket -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: 'Calibri', 'Arial', sans-serif; margin-bottom: 50px; margin-top: 40px;">
+          <tr>
+            <td width="30%" valign="top" style="text-align: center;">
+              <div style="border-bottom: 1px solid #9ca3af; margin: 0 auto 12px auto; width: 85%; height: 40px;">&nbsp;</div>
+              <div style="font-size: 9pt; font-weight: bold; color: #4b5563;">
+                HANDED OVER BY
+                <span style="display: block; font-size: 8pt; color: #9ca3af; font-weight: normal; margin-top: 2px; text-transform: uppercase;">Tufwud Site Supervisor</span>
+              </div>
+            </td>
+            <td width="5%">&nbsp;</td>
+            <td width="30%" valign="top" style="text-align: center;">
+              <div style="border-bottom: 1px solid #9ca3af; margin: 0 auto 12px auto; width: 85%; height: 40px;">&nbsp;</div>
+              <div style="font-size: 9pt; font-weight: bold; color: #4b5563;">
+                VERIFIED BY
+                <span style="display: block; font-size: 8pt; color: #9ca3af; font-weight: normal; margin-top: 2px; text-transform: uppercase;">Tufwud Lead QA Auditor</span>
+              </div>
+            </td>
+            <td width="5%">&nbsp;</td>
+            <td width="30%" valign="top" style="text-align: center;">
+              <div style="border-bottom: 1px solid #4f46e5; margin: 0 auto 12px auto; width: 85%; height: 40px;">&nbsp;</div>
+              <div style="font-size: 9pt; font-weight: bold; color: #4f46e5;">
+                TAKEN OVER BY
+                <span style="display: block; font-size: 8pt; color: #9ca3af; font-weight: normal; margin-top: 2px; text-transform: uppercase;">Authorized Client Rep</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Premium Corporate Footer -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; border-top: 1.5px solid #8a5a37; padding-top: 15px; margin-top: 40px; font-family: 'Calibri', 'Arial', sans-serif;">
+          <tr>
+            <td width="50%" align="left" style="font-size: 9pt; font-weight: bold; color: #6b7280; text-transform: uppercase;">
+              Kolkata | Mumbai | Delhi | Bangalore
+            </td>
+            <td width="50%" align="right" style="font-size: 9.5pt; font-weight: 900; color: #8a5a37; letter-spacing: 0.5px;">
+              CHOOSE INSULATED - CHOOSE TUFWUD
+            </td>
+          </tr>
+        </table>
+      `;
+    }
+
+    const styledHtml = `
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+  <meta charset="UTF-8">
+  <title>Tufwud Handover - ${handoverMode === 'certificate' ? 'Certificate' : 'Letter'}</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    @page {
+      size: A4;
+      margin: 0.8in 0.8in 0.8in 0.8in;
+    }
+    body {
+      font-family: 'Calibri', 'Arial', sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #111827;
+      background-color: #ffffff;
+    }
+    p {
+      margin-top: 0;
+      margin-bottom: 8pt;
+    }
+  </style>
+</head>
+<body>
+  ${contentHtml}
+</body>
+</html>
+    `;
+
+    const blob = new Blob(['\ufeff' + styledHtml], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tufwud_Handover_${handoverMode === 'certificate' ? 'Certificate' : 'Letter'}_${salesOrder}.doc`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2016,6 +2412,14 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 </button>
 
                 <button
+                  onClick={downloadAsWord}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <span>Download Word Doc</span>
+                </button>
+
+                <button
                   onClick={downloadAsCSV}
                   className="px-4 py-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-250 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
@@ -2082,7 +2486,7 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
             </div>
 
             {/* Extra inputs row for Handover Letter parameters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-zinc-150 pt-4 animate-fadeIn">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-zinc-150 pt-4 animate-fadeIn">
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Client / Site Contact Name</label>
                 <input
@@ -2102,6 +2506,17 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                   placeholder="e.g. Godrej Woods, Sector 43, Noida, UP"
                   className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
                 />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Company Letterhead Office</label>
+                <select
+                  value={companyAddressKey}
+                  onChange={(e) => setCompanyAddressKey(e.target.value as 'kolkata' | 'mumbai')}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition cursor-pointer"
+                >
+                  <option value="kolkata">Kolkata Office Address</option>
+                  <option value="mumbai">Mumbai Office Address</option>
+                </select>
               </div>
             </div>
 
@@ -2285,9 +2700,15 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                       </div>
                       <div className="space-y-12">
                         <div className="border-b border-zinc-300 mx-auto w-3/4 text-indigo-300" />
-                        <div className="text-indigo-600 font-extrabold">TAKEN OVER BY (Authorized Client Representative)</div>
+                        <div className="text-indigo-650 font-extrabold">TAKEN OVER BY (Authorized Client Representative)</div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Premium Corporate Footer */}
+                  <div className="border-t border-[#8a5a37]/30 pt-4 flex flex-col sm:flex-row items-center justify-between text-[9px] text-zinc-450 uppercase tracking-wider font-mono font-bold mt-6">
+                    <div>Kolkata | Mumbai | Delhi | Bangalore</div>
+                    <div className="text-[#8a5a37] font-extrabold tracking-wide">Choose INSULATED - Choose TUFWUD</div>
                   </div>
                 </div>
               )}
@@ -2332,23 +2753,66 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                 return (
                   <div className="bg-white rounded-3xl border border-zinc-300 shadow-lg p-8 sm:p-12 max-w-4xl mx-auto space-y-8 relative overflow-hidden flex flex-col justify-between min-h-[850px] text-zinc-800 font-sans">
                     <div className="space-y-6">
-                      {/* Brand Header */}
-                      <div className="border-b-2 border-[#8a5a37] pb-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-3.5">
-                          <div className="w-12 h-12 shrink-0">
+                      {/* Official Corporate Letterhead */}
+                      <div className="border-b-2 border-[#8a5a37] pb-4 flex flex-col md:flex-row items-start justify-between gap-6">
+                        {/* Left Side: Logo & Certifications */}
+                        <div className="flex flex-col sm:flex-row items-center md:items-start gap-4">
+                          <div className="w-14 h-14 shrink-0">
                             <TufwudLogoTransparent className="w-full h-full text-[#8a5a37]" />
                           </div>
-                          <div className="text-left">
-                            <div className="text-xl sm:text-2xl font-black text-[#6b4226] tracking-wide font-sans">
-                              TUFWUD DOORS &amp; ACCESSORIES PVT. LTD.
+                          <div className="text-center sm:text-left space-y-1.5">
+                            <div className="text-2xl font-black text-[#6b4226] tracking-tight font-sans leading-none">
+                              TUFWUD
                             </div>
-                            <div className="text-[11px] font-extrabold text-zinc-550 tracking-widest uppercase mt-0.5">
+                            <div className="text-[9px] font-black text-zinc-500 tracking-widest uppercase font-mono">
                               Site Installation — Handover Letter
+                            </div>
+                            
+                            {/* Certifications Row */}
+                            <div className="flex items-center gap-1 flex-wrap justify-center sm:justify-start">
+                              <span className="text-[8px] font-bold px-1.5 py-0.5 bg-zinc-50 text-zinc-600 border border-zinc-200 rounded uppercase font-mono tracking-tight" title="Forest Stewardship Council">
+                                FSC® C157844
+                              </span>
+                              <span className="text-[8px] font-bold px-1.5 py-0.5 bg-zinc-50 text-zinc-600 border border-zinc-200 rounded uppercase font-mono tracking-tight">
+                                ISO Certified
+                              </span>
+                              <span className="text-[8px] font-bold px-1.5 py-0.5 bg-zinc-50 text-zinc-600 border border-zinc-200 rounded uppercase font-mono tracking-tight">
+                                ISI Certified
+                              </span>
                             </div>
                           </div>
                         </div>
-                        <div className="hidden sm:block text-right text-[10px] font-black text-[#8a5a37] tracking-wider font-mono">
-                          QUALITY TRANSFER PROTOCOL
+
+                        {/* Right Side: Company Details & Selected Office Address */}
+                        <div className="text-center md:text-right space-y-0.5 w-full md:w-auto">
+                          <div className="text-xs font-black text-zinc-900 uppercase tracking-tight">
+                            Tufwud Doors &amp; Accessories Private Limited
+                          </div>
+                          <div className="text-[9.5px] font-bold text-zinc-550 italic">
+                            Formerly &quot;Khemka Timber Pvt. Ltd&quot;
+                          </div>
+                          <div className="text-[9px] font-extrabold text-zinc-400 font-mono">
+                            CIN: U20219WB1988PTC045247
+                          </div>
+                          
+                          {/* Selected Address Block */}
+                          <div className="text-[9.5px] text-zinc-600 leading-tight space-y-0.5 pt-1">
+                            {companyAddressKey === 'kolkata' ? (
+                              <p className="font-bold text-zinc-800">
+                                📍 111, D. H. Road, Behala, Kadamtala, Kolkata 700 063
+                              </p>
+                            ) : (
+                              <p className="font-bold text-zinc-800">
+                                📍 Sai Sangam Building, 4th Floor Flat No. 406, Plot 51A, Sector 16 Ulwe, Kharkopar, Navi Mumbai 410 206
+                              </p>
+                            )}
+                            <p className="text-zinc-500 text-[9px] font-medium">
+                              📞 +91 84200 50754 / +91 83350 60453 | ✉️ sales@tufwud.in / admin@tufwud.in
+                            </p>
+                            <p className="font-mono text-zinc-500 text-[8.5px] font-bold">
+                              🌐 www.tufwud.com
+                            </p>
+                          </div>
                         </div>
                       </div>
 
@@ -2376,9 +2840,10 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                       <div className="space-y-3.5 text-xs text-zinc-650 leading-relaxed font-medium">
                         <p>Dear Sir/Madam,</p>
                         <p>
-                          This is to confirm the status of door, frame, architrave and hardware installation carried out under the
-                          above order, as recorded on site. As of <strong className="text-zinc-950 font-bold">{todayStr}</strong>, <strong className="text-[#8a5a37] font-extrabold">{totalHandedOverCount} of {totalDoorsCount} doors ({totalHandoverPct}%)</strong> have been
-                          installed, inspected and signed off for handover.
+                          This letter serves to formally confirm the status and progressive handover of the door, frame, architrave,
+                          and hardware installation works executed under the aforementioned contract order. All specified units, as detailed
+                          in the comprehensive schedule below, have been meticulously installed, inspected for quality compliance, and
+                          officially signed off as ready for handover as of <strong className="text-zinc-950 font-bold">{todayStr}</strong>.
                         </p>
                       </div>
 
@@ -2445,6 +2910,12 @@ export default function FinancialReportsTab({ flats }: FinancialReportsTabProps)
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Premium Corporate Footer */}
+                    <div className="border-t border-[#8a5a37]/30 pt-4 flex flex-col sm:flex-row items-center justify-between text-[9px] text-zinc-450 uppercase tracking-wider font-mono font-bold mt-6">
+                      <div>Kolkata | Mumbai | Delhi | Bangalore</div>
+                      <div className="text-[#8a5a37] font-extrabold tracking-wide">Choose INSULATED - Choose TUFWUD</div>
                     </div>
                   </div>
                 );

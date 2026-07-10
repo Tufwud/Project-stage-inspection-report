@@ -520,6 +520,7 @@ export default function FlatListTable({
                 const hwPct = getMilestoneProgress(flat, 'hardwareFixing');
                 const ptPct = getMilestoneProgress(flat, 'painting');
                 const hoPct = getMilestoneProgress(flat, 'handover');
+                const isPreHandoverApproved = ffPct === 100 && dfPct === 100 && hwPct === 100 && ptPct === 100;
 
                 // Color generators for milestones
                 const getMilestoneColor = (pct: number) => {
@@ -674,7 +675,7 @@ export default function FlatListTable({
 
                     {/* Quick Bulk Action column */}
                     <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
-                      {overallPct === 100 ? (
+                      {isPreHandoverApproved ? (
                         <span className="inline-flex items-center gap-1 text-[10.5px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
                           <span>100% APPROVED</span>
@@ -684,7 +685,7 @@ export default function FlatListTable({
                           type="button"
                           onClick={() => onBulkApproveFlat?.(flat.id)}
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-650 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[10.5px] font-extrabold rounded-xl transition shadow-3xs cursor-pointer select-none uppercase tracking-wide"
-                          title="Instantly set every checklist item across all stages to Approved (100%)"
+                          title="Instantly set every checklist item across all stages to Approved (100%) except Handover"
                         >
                           <CheckSquare className="w-3.5 h-3.5" />
                           <span>Approve All Stages</span>

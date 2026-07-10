@@ -241,18 +241,15 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
 
   // Bulk update checklist for active stage
   const handleStageBulkUpdate = (milestoneKey: MilestoneKey, complete: boolean) => {
-    if (milestoneKey === 'handover') {
-      // Handover is manual-only exception
-      return;
-    }
     setFormData(prev => {
       if (!prev) return null;
       const meta = MILESTONES.find(m => m.key === milestoneKey);
       if (!meta) return prev;
 
       const updatedMilestone = { ...prev[milestoneKey] } as any;
+      const isHandover = milestoneKey === 'handover';
       Object.keys(meta.subtaskLabels).forEach(key => {
-        updatedMilestone[key] = complete ? 'approved' : 'not_started';
+        updatedMilestone[key] = complete ? (isHandover ? 'handed_over' : 'approved') : 'not_started';
       });
 
       if (complete) {
@@ -269,7 +266,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
     });
   };
 
-  // Bulk update all checkpoints across all stages (milestones) to approved at once
+  // Bulk update all checkpoints across all stages (milestones) to approved at once, excluding handover
   const handleAllStagesBulkApproved = () => {
     setFormData(prev => {
       if (!prev) return null;
@@ -278,7 +275,7 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
       MILESTONES.forEach(meta => {
         const milestoneKey = meta.key;
         if (milestoneKey === 'handover') {
-          // Handover is manual-only exception and is left untouched during bulk approve all
+          // Handover will not be flashfilled
           return;
         }
         const currentMilestone = { ...(updated[milestoneKey] || {}) } as any;
@@ -755,22 +752,21 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between pb-2 border-b border-zinc-200/50">
                   <span className="text-xs font-bold text-zinc-800 uppercase tracking-tight font-sans">Requirement Toggles</span>
-                  {activeTab !== 'handover' ? (
                     <div className="flex items-center gap-2 flex-wrap">
                       <button
                         type="button"
                         onClick={() => handleStageBulkUpdate(activeTab, true)}
                         className="text-[10px] font-bold text-indigo-650 hover:text-indigo-800 uppercase"
-                        title="Approve all items in current tab only"
+                        title={activeTab === 'handover' ? "Set all handover items to Handed Over" : "Approve all items in current tab only"}
                       >
-                        Fill Active Approved
+                        {activeTab === 'handover' ? "Fill Active Handed Over" : "Fill Active Approved"}
                       </button>
                       <span className="text-zinc-300">|</span>
                       <button
                         type="button"
                         onClick={handleAllStagesBulkApproved}
                         className="text-[10px] font-extrabold text-emerald-650 hover:text-emerald-800 uppercase bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200"
-                        title="Approve all items in ALL stages at once"
+                        title="Approve all stages & set handover to handed over at once"
                       >
                         FILL ALL APPROVED (ALL STAGES)
                       </button>
@@ -784,11 +780,6 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                         Clear Active
                       </button>
                     </div>
-                  ) : (
-                    <div className="text-[9px] font-extrabold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200 uppercase font-mono tracking-wider">
-                      ⚠️ Handover Stage: Exception (Requires Manual Selection)
-                    </div>
-                  )}
                 </div>
 
                 {(() => {
@@ -844,11 +835,18 @@ export default function FlatDetailModal({ flat, isOpen, onClose, onSave, onDelet
                             onChange={(e) => handleDropdownChange(activeTab, taskKey, e.target.value)}
                             className={`w-full sm:w-auto max-w-[170px] xs:max-w-[210px] sm:max-w-[250px] md:max-w-xs truncate px-3 py-1.5 border rounded-xl text-xs font-bold focus:outline-none focus:ring-1 focus:ring-zinc-400 cursor-pointer ${currentChoice.color}`}
                           >
-                            {Object.values(QUALITATIVE_CHOICES).map(choice => (
-                              <option key={choice.key} value={choice.key} className="bg-white text-zinc-800 font-medium">
-                                ({getMetricLabel(choice)}) {choice.label}
-                              </option>
-                            ))}
+                            {Object.values(QUALITATIVE_CHOICES)
+                              .filter(choice => {
+                                if (activeTab === 'handover') {
+                                  return choice.key === 'not_started' || choice.key === 'handed_over';
+                                }
+                                return true;
+                              })
+                              .map(choice => (
+                                <option key={choice.key} value={choice.key} className="bg-white text-zinc-800 font-medium">
+                                  ({getMetricLabel(choice)}) {choice.label}
+                                </option>
+                              ))}
                           </select>
                         </div>
                       </div>

@@ -679,7 +679,7 @@ export default function App() {
       MILESTONES.forEach(meta => {
         const milestoneKey = meta.key;
         if (milestoneKey === 'handover') {
-          // Handover stage must be user filled and is an exception from auto-fill all
+          // Handover will not be flashfilled
           return;
         }
         const currentMilestone = { ...(updated[milestoneKey] || {}) } as any;
