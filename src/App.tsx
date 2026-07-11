@@ -365,7 +365,11 @@ export default function App() {
         updated = [updatedRecord, ...prev];
       }
 
-      localStorage.setItem("door_quality_compliance_dashboard_history", JSON.stringify(updated));
+      try {
+        localStorage.setItem("door_quality_compliance_dashboard_history", JSON.stringify(updated));
+      } catch (err) {
+        console.warn("Storage Quota Exceeded. Failed to write history to localStorage. Working with local state instead.", err);
+      }
       return updated;
     });
   };
@@ -435,6 +439,46 @@ export default function App() {
     try {
       localStorage.setItem("door_quality_compliance_dashboard_history", JSON.stringify([]));
     } catch (e) {}
+  };
+
+  const handleImportProjects = (importedProjects: SavedProject[], activateSalesOrderNo?: string) => {
+    setSavedProjects(prev => {
+      const updated = [...prev];
+      importedProjects.forEach(imp => {
+        const idx = updated.findIndex(p => p.salesOrderNo === imp.salesOrderNo);
+        if (idx > -1) {
+          updated[idx] = {
+            ...updated[idx],
+            ...imp,
+            flats: imp.flats
+          };
+        } else {
+          updated.unshift(imp);
+        }
+      });
+      try {
+        localStorage.setItem("door_quality_compliance_dashboard_history", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    if (activateSalesOrderNo) {
+      const target = importedProjects.find(p => p.salesOrderNo === activateSalesOrderNo);
+      if (target) {
+        setFlats(target.flats);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(target.flats));
+        } catch (e) {}
+        if (target.doorPrices) {
+          setDoorPrices(target.doorPrices);
+          try {
+            localStorage.setItem("door_quality_compliance_dashboard_door_prices", JSON.stringify(target.doorPrices));
+          } catch (e) {}
+        }
+        setSelectedTower(null);
+        setSelectedFloor(null);
+      }
+    }
   };
 
   // Load from local storage on mount
@@ -912,7 +956,11 @@ export default function App() {
           </div>
         ) : activeTab === 'sheets' ? (
           <div className="pt-2 animate-fadeIn">
-            <GoogleSheetsTab flats={flats} savedProjects={savedProjects} />
+            <GoogleSheetsTab 
+              flats={flats} 
+              savedProjects={savedProjects} 
+              onImportProjects={handleImportProjects}
+            />
           </div>
         ) : (
           <div className="pt-2 animate-fadeIn">

@@ -1039,3 +1039,232 @@ export const syncErpPdfToDrive = async (
   };
 };
 
+/**
+ * Fetches sheet values for a specific spreadsheet ID and range.
+ */
+export const getSheetValues = async (
+  accessToken: string,
+  spreadsheetId: string,
+  range: string
+): Promise<any[][]> => {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Failed to fetch sheet values for range ${range}: ${errText}`);
+  }
+
+  const data = await response.json();
+  return data.values || [];
+};
+
+/**
+ * Parses a string cell value back into a boolean or QualitativeState
+ */
+export function parseCellState(val: any): boolean | QualitativeState {
+  if (val === undefined || val === null) return 'not_started';
+  const v = String(val).trim();
+  const vLower = v.toLowerCase();
+  
+  if (v === '' || vLower === 'not started' || vLower === 'not_started' || vLower === '✗' || vLower === 'false' || v === '0') {
+    return 'not_started';
+  }
+  
+  if (vLower === 'approved' || vLower === 'n/a- approved' || vLower === '✓' || vLower === 'true' || v === '1' || vLower === 'yes' || vLower === 'y') {
+    return 'approved';
+  }
+  
+  if (vLower === 'approved with remarks') {
+    return 'approved_remarks';
+  }
+  
+  if (vLower === 'repair reqd.' || vLower === 'repair reqd') {
+    return 'repair_reqd';
+  }
+  
+  if (vLower === 'rework needed') {
+    return 'rework_needed';
+  }
+  
+  if (vLower === 'not approved- remarks') {
+    return 'not_approved';
+  }
+  
+  if (vLower === 'rejected- debit contractor' || vLower === 'rejected') {
+    return 'rejected';
+  }
+  
+  if (vLower === 'handed over to client' || vLower === 'handed over') {
+    return 'handed_over';
+  }
+
+  // Fallback to check if it matches a raw key
+  if (QUALITATIVE_CHOICES[v as QualitativeState]) {
+    return v as QualitativeState;
+  }
+  if (QUALITATIVE_CHOICES[vLower as QualitativeState]) {
+    return vLower as QualitativeState;
+  }
+  
+  return 'not_started';
+}
+
+/**
+ * Parses raw Google Sheet rows (from Raw Quality Logs Tab) back into FlatRecord objects
+ */
+export function parseSheetRowsToFlats(rows: any[][]): FlatRecord[] {
+  if (!rows || rows.length === 0) return [];
+
+  const flats: FlatRecord[] = [];
+
+  rows.forEach((row, idx) => {
+    // Row must have at least flat ID, Sales Order No, Flat No, etc.
+    if (!row || row.length < 11) return;
+
+    const id = row[0] ? String(row[0]).trim() : `REC-IMPORTED-${idx + 1}`;
+    const oaNo = row[1] ? String(row[1]).trim() : '';
+    
+    // Ignore headers, empty rows or informational rows
+    if (!oaNo || oaNo === '6-Digit SO Identifier (Sales Order No)*' || oaNo.toLowerCase().includes('so identifier')) {
+      return;
+    }
+
+    const soDetails = row[2] ? String(row[2]).trim() : '';
+    const numTowers = parseInt(String(row[3])) || 1;
+    const totalFloors = parseInt(String(row[4])) || 1;
+    const flatsPerFloor = parseInt(String(row[5])) || 4;
+    const doorsPerFlat = row[6] ? String(row[6]).trim() : '';
+    const towerId = row[7] ? String(row[7]).trim() : 'Tower 01';
+    const floor = parseInt(String(row[8])) || 1;
+    const flatNo = row[9] ? String(row[9]).trim() : '101';
+    const doorName = row[10] ? String(row[10]).trim() : 'Main Door';
+    const supervisor = row[11] && String(row[11]) !== 'N/A' ? String(row[11]).trim() : '';
+    const contractor = row[12] && String(row[12]) !== 'N/A' ? String(row[12]).trim() : '';
+
+    const frameFixing = {
+      fastenerFixing: parseCellState(row[13]),
+      frameLockAreaFinish: parseCellState(row[14]),
+      outsideArchitraveFixing: parseCellState(row[15]),
+      insideArchitraveFixing: parseCellState(row[16]),
+      doneBy: row[17] && String(row[17]) !== 'N/A' ? String(row[17]).trim() : '',
+      timestamp: row[18] && String(row[18]) !== 'N/A' ? String(row[18]).trim() : ''
+    };
+
+    const doorFixing = {
+      shutterEdgeFinishing: parseCellState(row[19]),
+      gapBetweenFrameAndShutter: parseCellState(row[20]),
+      iSealFixing: parseCellState(row[21]),
+      visionGlassBeatFinishing: parseCellState(row[22]),
+      doneBy: row[23] && String(row[23]) !== 'N/A' ? String(row[23]).trim() : '',
+      timestamp: row[24] && String(row[24]) !== 'N/A' ? String(row[24]).trim() : ''
+    };
+
+    const hardwareFixing = {
+      hingeFitting: parseCellState(row[25]),
+      lockWithHandleFitting: parseCellState(row[26]),
+      eyeviewInstallation: parseCellState(row[27]),
+      towerBoltInstallation: parseCellState(row[28]),
+      doorCloserInstallation: parseCellState(row[29]),
+      autoDropSealInstallation: parseCellState(row[30]),
+      doneBy: row[31] && String(row[31]) !== 'N/A' ? String(row[31]).trim() : '',
+      timestamp: row[32] && String(row[32]) !== 'N/A' ? String(row[32]).trim() : ''
+    };
+
+    const painting = {
+      frameCarpatchFillingSanding: parseCellState(row[33]),
+      frameTouchUp: parseCellState(row[34]),
+      shutterEdgeFinishing: parseCellState(row[35]),
+      lockSlotAreaFinishing: parseCellState(row[36]),
+      shutterTouchUp: parseCellState(row[37]),
+      doneBy: row[38] && String(row[38]) !== 'N/A' ? String(row[38]).trim() : '',
+      timestamp: row[39] && String(row[39]) !== 'N/A' ? String(row[39]).trim() : ''
+    };
+
+    const handover = {
+      hardwareCleaning: parseCellState(row[40]),
+      plasticCoverRemoval: parseCellState(row[41]),
+      keysHandover: parseCellState(row[42]),
+      doneBy: row[43] && String(row[43]) !== 'N/A' ? String(row[43]).trim() : '',
+      timestamp: row[44] && String(row[44]) !== 'N/A' ? String(row[44]).trim() : ''
+    };
+
+    flats.push({
+      id,
+      oaNo,
+      soDetails,
+      numTowers,
+      totalFloors,
+      flatsPerFloor,
+      doorsPerFlat,
+      towerId,
+      floor,
+      flatNo,
+      doorName,
+      supervisor,
+      contractor,
+      frameFixing,
+      doorFixing,
+      hardwareFixing,
+      painting,
+      handover,
+      price: 5000 // default or fallback
+    });
+  });
+
+  return flats;
+}
+
+/**
+ * Groups FlatRecords by Sales Order (oaNo) and wraps them as SavedProject records.
+ */
+export function groupFlatsIntoProjects(flats: FlatRecord[]): any[] {
+  const projectsMap: { [oaNo: string]: FlatRecord[] } = {};
+  
+  flats.forEach(f => {
+    if (!f.oaNo) return;
+    if (!projectsMap[f.oaNo]) {
+      projectsMap[f.oaNo] = [];
+    }
+    projectsMap[f.oaNo].push(f);
+  });
+
+  return Object.keys(projectsMap).map(oaNo => {
+    const projFlats = projectsMap[oaNo];
+    const numTowers = new Set(projFlats.map(f => f.towerId)).size || 1;
+    const totalFloors = Math.max(...projFlats.map(f => f.floor), 0) || 1;
+    const flatsPerFloor = projFlats[0]?.flatsPerFloor || 4;
+    const doorTypes = Array.from(new Set(projFlats.map(f => f.doorName)));
+
+    return {
+      salesOrderNo: oaNo,
+      soDetails: projFlats[0]?.soDetails || '',
+      flats: projFlats,
+      timestamp: new Date().toISOString(),
+      numTowers,
+      totalFloors,
+      flatsPerFloor,
+      doorTypesToGenerate: doorTypes,
+      doorPrices: {
+        A: 5000,
+        B: 5000,
+        C: 5000,
+        D: 5000,
+        E: 5000,
+        F: 5000,
+        G: 5000,
+        H: 5000,
+        I: 5000,
+        J: 5000
+      }
+    };
+  });
+}
+

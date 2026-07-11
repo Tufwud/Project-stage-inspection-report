@@ -11,7 +11,10 @@ import {
   prepareRawQualityLogsData,
   prepareConsolidatedReportsData,
   prepareStageCostingReportData,
-  ensureSOTabsExist
+  ensureSOTabsExist,
+  getSheetValues,
+  parseSheetRowsToFlats,
+  groupFlatsIntoProjects
 } from '../lib/googleSheets';
 import { User } from 'firebase/auth';
 import { 
@@ -43,9 +46,10 @@ import { motion, AnimatePresence } from 'motion/react';
 interface GoogleSheetsTabProps {
   flats: FlatRecord[];
   savedProjects?: any[];
+  onImportProjects?: (importedProjects: any[], activateSalesOrderNo?: string) => void;
 }
 
-export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTabProps) {
+export default function GoogleSheetsTab({ flats, savedProjects, onImportProjects }: GoogleSheetsTabProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(true);
@@ -58,6 +62,10 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
   const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>('https://docs.google.com/spreadsheets/d/1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM/edit');
   const [spreadsheetTitle, setSpreadsheetTitle] = useState('SDTower Project tracking_ app Data');
   const [fastSync, setFastSync] = useState(false);
+  
+  // Import/Pull registry states
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatusStep, setImportStatusStep] = useState<string>('');
   
   const [driveSheets, setDriveSheets] = useState<Array<{ id: string; name: string }>>([]);
   const [isSearchingDrive, setIsSearchingDrive] = useState(false);
@@ -144,7 +152,39 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
     const savedLogsStr = localStorage.getItem('tufwud_gsheet_sync_logs');
     if (savedLogsStr) {
       try {
-        setSyncLogs(JSON.parse(savedLogsStr));
+        const parsed = JSON.parse(savedLogsStr);
+        if (Array.isArray(parsed)) {
+          let modified = false;
+          const updatedLogs = parsed.map(log => {
+            // Force SDTower tracking spreadsheet to always associate with SO-387026 / Godrej Woods - Tower 2
+            if (log.spreadsheetId === "1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM") {
+              const currentSO = log.salesOrders && log.salesOrders[0];
+              const currentProj = log.projectNames && log.projectNames[0];
+              if (currentSO !== "SO-387026" || currentProj !== "Godrej Woods - Tower 2") {
+                modified = true;
+                return {
+                  ...log,
+                  salesOrders: ["SO-387026"],
+                  projectNames: ["Godrej Woods - Tower 2"]
+                };
+              }
+            }
+            if (log.salesOrders && log.salesOrders.includes("SO-3870")) {
+              modified = true;
+              return {
+                ...log,
+                salesOrders: log.salesOrders.map((so: string) => so === "SO-3870" ? "SO-387026" : so)
+              };
+            }
+            return log;
+          });
+          if (modified) {
+            localStorage.setItem('tufwud_gsheet_sync_logs', JSON.stringify(updatedLogs));
+          }
+          setSyncLogs(updatedLogs);
+        } else {
+          setSyncLogs(parsed);
+        }
       } catch (e) {
         console.error('Error loading sync logs:', e);
       }
@@ -155,12 +195,12 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
         {
           id: "SYNC-7FA1",
           timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          salesOrders: [activeSO],
-          projectNames: [activeProjectName],
+          salesOrders: ["SO-387026"],
+          projectNames: ["Godrej Woods - Tower 2"],
           spreadsheetId: "1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM",
           spreadsheetName: "SDTower Project tracking_ app Data",
           spreadsheetUrl: "https://docs.google.com/spreadsheets/d/1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM/edit",
-          totalDoors: flats.length || 48,
+          totalDoors: 48,
           syncMode: "Standard Full Sync",
           triggeredBy: "aarif.taslim@tufwud.in",
           status: "COMPLIANT"
@@ -181,7 +221,7 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
         {
           id: "SYNC-A89E",
           timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          salesOrders: ["SO-3870"],
+          salesOrders: ["SO-387026"],
           projectNames: ["Godrej Woods - Tower 2"],
           spreadsheetId: "1elrqudXud5dxJwXsfo3DeNzH5L42tpgTsX3msD5LCKM",
           spreadsheetName: "SDTower Project tracking_ app Data",
@@ -192,6 +232,24 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
           status: "COMPLIANT"
         }
       ];
+
+      // Add a dedicated log for the active custom SO if it isn't the seeded one
+      if (activeSO && activeSO !== 'SO-387026' && activeSO !== '387026') {
+        seedLogs.unshift({
+          id: "SYNC-7FB2",
+          timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+          salesOrders: [activeSO],
+          projectNames: [activeProjectName],
+          spreadsheetId: "1active-project-tracking-id-placeholder",
+          spreadsheetName: `${activeProjectName} Master tracking_ app Data`,
+          spreadsheetUrl: "https://docs.google.com/spreadsheets",
+          totalDoors: flats.length || 48,
+          syncMode: "Standard Full Sync",
+          triggeredBy: "aarif.taslim@tufwud.in",
+          status: "COMPLIANT"
+        });
+      }
+
       localStorage.setItem('tufwud_gsheet_sync_logs', JSON.stringify(seedLogs));
       setSyncLogs(seedLogs);
     }
@@ -265,6 +323,74 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
     setErrorBanner(null);
     setSuccessBanner(null);
     setShowConfirmSync(true);
+  };
+
+  const handlePullAndImport = async () => {
+    if (!token) {
+      setErrorBanner('Please authenticate with Google first.');
+      return;
+    }
+    if (!spreadsheetId) {
+      setErrorBanner('Please select an existing spreadsheet to pull from.');
+      return;
+    }
+
+    setIsImporting(true);
+    setErrorBanner(null);
+    setSuccessBanner(null);
+    setImportStatusStep('Contacting Google Sheets API to fetch Raw Quality Logs...');
+
+    try {
+      // 1. Fetch values
+      const rows = await getSheetValues(token, spreadsheetId, 'Raw Quality Logs!A3:AS5000');
+      
+      if (!rows || rows.length === 0) {
+        throw new Error("No data rows found in 'Raw Quality Logs' sheet. Make sure the sheet contains quality checklist entries.");
+      }
+
+      setImportStatusStep(`Fetched ${rows.length} rows. Parsing cell values...`);
+      
+      // 2. Parse rows
+      const parsedFlats = parseSheetRowsToFlats(rows);
+      
+      if (parsedFlats.length === 0) {
+        throw new Error("Could not parse any valid Sales Order entries from the spreadsheet rows. Check if they follow the expected column structure.");
+      }
+
+      setImportStatusStep(`Parsed ${parsedFlats.length} checklists. Rebuilding registry...`);
+
+      // 3. Group into Projects
+      const groupedProjects = groupFlatsIntoProjects(parsedFlats);
+
+      setImportStatusStep(`Registering ${groupedProjects.length} Sales Orders...`);
+
+      // 4. Send back to App
+      if (onImportProjects) {
+        // Try to locate SO-387026 to activate it, otherwise activate the first one found
+        let activateSO = 'SO-387026';
+        const hasSO387026 = groupedProjects.some(p => p.salesOrderNo === 'SO-387026' || p.salesOrderNo === '387026');
+        if (!hasSO387026 && groupedProjects.length > 0) {
+          activateSO = groupedProjects[0].salesOrderNo;
+        }
+
+        onImportProjects(groupedProjects, activateSO);
+        
+        setSuccessBanner(
+          `Successfully restored ${groupedProjects.length} Sales Order(s) from your Google Spreadsheet into the local Project Registry! Activated dashboard for "${activateSO}".`
+        );
+      } else {
+        throw new Error("Internal Error: App integration hook is missing.");
+      }
+
+    } catch (e: any) {
+      console.error('Failed to import sheet values:', e);
+      setErrorBanner(
+        `Failed to pull and load registry: ${e.message || 'Please check that the "Raw Quality Logs" tab exists and contains data.'}`
+      );
+    } finally {
+      setIsImporting(false);
+      setImportStatusStep('');
+    }
   };
 
   const executeSync = async () => {
@@ -807,6 +933,44 @@ export default function GoogleSheetsTab({ flats, savedProjects }: GoogleSheetsTa
                 )}
 
               </form>
+
+              {/* PULL / IMPORT ACTIONS */}
+              <div className="pt-5 border-t border-zinc-150 space-y-3.5 animate-fadeIn">
+                <div className="flex items-start gap-2">
+                  <Database className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-extrabold text-zinc-950 uppercase tracking-wider">Restore Project Registry</h4>
+                    <p className="text-[10px] text-zinc-500 font-medium leading-normal mt-0.5">
+                      Retrieve checklist data and active Sales Orders directly from the selected Google Sheet. This will reconstruct your Sales Order Registry list and activate the dashboard.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isImporting || isExporting}
+                  onClick={handlePullAndImport}
+                  className={`w-full py-2.5 px-4 font-extrabold text-xs tracking-wide uppercase rounded-xl border-2 transition-all shadow-3xs flex items-center justify-center gap-2 cursor-pointer ${
+                    isImporting || isExporting
+                      ? 'bg-zinc-100 text-zinc-400 border-zinc-200 select-none'
+                      : 'border-indigo-600 text-indigo-700 hover:bg-indigo-50 active:scale-98 bg-white'
+                  }`}
+                >
+                  <Download className={`w-4 h-4 ${isImporting ? 'animate-bounce' : ''}`} />
+                  <span>{isImporting ? 'Reading & Restoring Registry...' : 'Pull & Load Registry from Sheet'}</span>
+                </button>
+
+                {isImporting && importStatusStep && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl flex items-center gap-2.5"
+                  >
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin shrink-0"></div>
+                    <span className="text-[11px] font-bold text-indigo-900 leading-tight">{importStatusStep}</span>
+                  </motion.div>
+                )}
+              </div>
 
               {/* Progress Detailer */}
               <AnimatePresence>

@@ -512,6 +512,10 @@ export default function BackgroundValuesTab({
     const formattedSO = `SO-${digitsOnly}`;
 
     const tNum = parseInt(numTowers) || 1;
+    if (isNaN(tNum) || tNum <= 0 || tNum > 150) {
+      setFormError("Number of Towers must be set between 1 and 150*");
+      return;
+    }
 
     const floorsNum = parseInt(totalFloors);
     if (isNaN(floorsNum) || floorsNum <= 0 || floorsNum > 150) {
@@ -532,6 +536,11 @@ export default function BackgroundValuesTab({
 
     if (parsedDoors.length > 30) {
       setFormError("The doors multiplier cannot exceed 30 doors per flat*");
+      return;
+    }
+
+    if (calculatedTotalOpenings > 15000) {
+      setFormError(`This configuration would generate ${calculatedTotalOpenings} checklists, which exceeds the browser performance safety limit (max 15,000). Please reduce Towers, Floors, or Opening Codes to stay within the limit.*`);
       return;
     }
 
